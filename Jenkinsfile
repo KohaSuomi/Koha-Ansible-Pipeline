@@ -2,6 +2,11 @@
 
 import groovy.json.JsonSlurperClassic
 
+/**
+ * THIS FILE IS FROM https://github.com/KohaSuomi/Koha-Ansible-Pipeline/blob/master/Jenkinsfile
+ * Maintain version control there.
+ * Cannot load this file directly from SCM because of the groovy sandbox limitations
+ */
 
 /*
   Available environment variables, see. https://wiki.jenkins-ci.org/display/JENKINS/Building+a+software+project
