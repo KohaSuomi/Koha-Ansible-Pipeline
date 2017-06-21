@@ -30,7 +30,9 @@ Binding bindings = [
       invoke them with env.NODE_NAME
     */
     'env': ['BUILD_ID': 666,
-            'BUILD_URL': 'https://jenkins.example.org']
+            'BUILD_URL': 'https://jenkins.example.org',
+            'EXECUTOR_NUMBER': 1
+           ]
 ]
 
 /*

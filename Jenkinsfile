@@ -35,6 +35,7 @@ def debug = System.getenv('PIPE_DEBUG')
 
 /* PROGRAM PATHS */
 def sendIrcMsgProgram = debug ? 'mocks/sendIrcMsg.sh' : '/usr/local/bin/sendIrcMsg.sh'
+def ansbileInterfaceDir='/opt/jenkins_ansbiletorpor_interface/'
 
 
 /* GITHUB PARAMS */
@@ -170,6 +171,9 @@ def sendIrcMsg = {
 
 getSystemInfo()
 
+//Which ci Koha we run this pipeline on?
+def kohaCIName = "koha_ci_"+(env.EXECUTOR_NUMBER+1) //EXECUTOR_NUMBER starts from 0
+
 def githead, gitcommit, gitmessage, gitauthor
 try {
     githead    = githubGetHEAD()
@@ -181,10 +185,8 @@ try {
     sendIrcMsg("Build "+env.BUILD_ID+"> ${IRCRED}Trying to build but GitHub API is malfunctioning?${IRCCLEAR}: "+e.toString())
     throw e
 }
-sendIrcMsg("Build "+env.BUILD_ID+"> ${IRCBROWN}${gitauthor} just committed '$gitmessage'. Starting build "+env.BUILD_URL+"${IRCCLEAR}")
+sendIrcMsg("Build "+env.BUILD_ID+"> ${IRCBROWN}${gitauthor} just committed '$gitmessage'. Starting build "+env.BUILD_URL+" using executor "+env.EXECUTOR_NUMBER+"${IRCCLEAR}")
 
-
-scriptsDir='/opt/jenkins_ansbiletorpor_interface/'
 
 stage('Provision') {
     def stageName = "Provision"
@@ -193,7 +195,7 @@ stage('Provision') {
         try {
             sendIrcMsg("Build "+env.BUILD_ID+"> ${IRCBROWN}Starting $stageName${IRCCLEAR}")
 
-            sh "$scriptsDir/jenkins_interface.sh build koha_ci_1"
+            sh "$ansbileInterfaceDir/jenkins_interface.sh build $kohaCIName"
 
             sendIrcMsg("Build "+env.BUILD_ID+"> $stageName ${IRCGREEN}${IRCBOLD}PASSED${IRCCLEAR}")
         } catch(e) {
@@ -210,13 +212,13 @@ stage('Git tests') {
         try {
             sendIrcMsg("${IRCBROWN}Build "+env.BUILD_ID+"> ${IRCBROWN}Starting $stageName${IRCCLEAR}")
 
-            sh "$scriptsDir/jenkins_interface.sh git koha_ci_1"
+            sh "$ansbileInterfaceDir/jenkins_interface.sh git $kohaCIName"
 
-            junit keepLongStdio: true, testResults: '**/testResults/junit/*.xml'
+            junit keepLongStdio: true, testResults: "**/$kohaCIName/testResults/junit/*.xml"
 
             step([
                 $class: 'CloverPublisher',
-                cloverReportDir: "testResults/clover",
+                cloverReportDir: "$kohaCIName/testResults/clover",
                 cloverReportFileName: 'clover.xml',
                 healthyTarget: [methodCoverage: 70, conditionalCoverage: 80, statementCoverage: 80], // optional, default is: method=70, conditional=80, statement=80
                 unhealthyTarget: [methodCoverage: 50, conditionalCoverage: 50, statementCoverage: 50], // optional, default is none
@@ -239,13 +241,13 @@ stage('Full tests') {
         try {
             sendIrcMsg("${IRCBROWN}Build "+env.BUILD_ID+"> ${IRCBROWN}Starting $stageName${IRCCLEAR}")
 
-            sh "$scriptsDir/jenkins_interface.sh all koha_ci_1"
+            sh "$ansbileInterfaceDir/jenkins_interface.sh all $kohaCIName"
 
-            junit keepLongStdio: true, testResults: '**/testResults/junit/*.xml'
+            junit keepLongStdio: true, testResults: '**/$kohaCIName/testResults/junit/*.xml'
 
             step([
                 $class: 'CloverPublisher',
-                cloverReportDir: "testResults/clover",
+                cloverReportDir: "$kohaCIName/testResults/clover",
                 cloverReportFileName: 'clover.xml',
                 healthyTarget: [methodCoverage: 70, conditionalCoverage: 80, statementCoverage: 80], // optional, default is: method=70, conditional=80, statement=80
                 unhealthyTarget: [methodCoverage: 50, conditionalCoverage: 50, statementCoverage: 50], // optional, default is none
@@ -262,8 +264,8 @@ stage('Full tests') {
     }
 }
 
-stage('deploy to acceptance koha_ci') {
+stage('deploy to acceptance koha_cis') {
 
-    sh "$scriptsDir/jenkins_interface.sh deploy"
+    sh "$ansbileInterfaceDir/jenkins_interface.sh deploy"
 
 }
