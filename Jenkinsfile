@@ -49,7 +49,7 @@ def _githubApiCall(url) {
     return _parseJson(sout.toString())
 }
 
-def getSystemInfo {
+def getSystemInfo() {
     def info = "System info:\n"
 
     def cmd = "/bin/hostname"
