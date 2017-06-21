@@ -3,13 +3,21 @@
 import groovy.json.JsonSlurperClassic
 
 
+
+/*
+  Available environment variables, see. https://wiki.jenkins-ci.org/display/JENKINS/Building+a+software+project
+  invoke them with env.NODE_NAME
+*/
+
 /*
   DEFINING GLOBAL VARIABLES AND FUNCTIONS
 */
 
 /* DEBUG PARAMS */
 
-def env = System.getenv()
+// 2 or 1 or null
+def sysenv = System.getenv() //env is already overloaded by Jenkins and has Jenkins' own params
+sysenv['PIPE_DEBUG'] = 1
 env['PIPE_DEBUG'] = 1
 
 
@@ -37,65 +45,58 @@ def githubGetCommit = {
 }
 def _githubApiCall(url) {
     def cmd = "/usr/bin/curl --silent $url"
-    //Need to used StringBuilder here because the Process Streams get closed after they are read once.
-    def sout = new StringBuilder(), serr = new StringBuilder()
-    def proc = cmd.execute()
-    proc.consumeProcessOutput(sout, serr)
-    proc.waitForOrKill(1000)
-
-    // for debugging in Jenkins' Script Console
-    println _dumpProcess(cmd, proc, sout, serr)
-    if (proc.exitValue() != 0) {
-        throw new Exception(_dumpProcess(cmd, proc, sout, serr))
-    }
+    def (proc, sout, serr) = _sysCmd(cmd)
     return _parseJson(sout.toString())
-}
-def _parseJson(string) {
-    return new groovy.json.JsonSlurperClassic().parseText(string)
-}
-
-def _sysCmd(cmd, timeout, verbose) {
-    verbose = debug
-    timeout = timeout ? timeout : 5000 //default timeout 5 seconds
-
-    //Need to used StringBuilder here because the Process Streams get closed after they are read once.
-    def sout = new StringBuilder(), serr = new StringBuilder()
-    def proc = cmd.execute()
-    proc.consumeProcessOutput(sout, serr)
-    proc.waitForOrKill(timeout)
-
-    // for debugging in Jenkins' Script Console
-    if (verbose && verbose == 1) {
-        println _dumpProcess(cmd, proc, sout, serr, verbose)
-    }
-    if (proc.exitValue() != 0) {
-        throw new Exception(_dumpProcess(cmd, proc, sout, serr))
-    }
-    return [proc, sout, serr]
 }
 
 def getSystemInfo {
-    ok
-    
+    def info = "System info:\n"
+
+    def cmd = "/bin/hostname"
+    def (proc, sout, serr) = _sysCmd(cmd)
+    info += 'Hostname: '+sout.toString()+"\n"
+
+    if (env['PIPE_DEBUG'] > 0) {
+        info += "Environment:\n"
+        for (String k : env) {
+            info += "$k -> "+env[k]+"\n"
+        }
+    }
+
+    println info
 }
 
 def sendIrcMsg = {
     msg ->
     //Don't use "" in your message
     def cmd = "/usr/local/bin/sendIrcMsg.sh $msg"
+    _sysCmd(cmd, 10000)
+}
 
-    //Need to used StringBuilder here because the Process Streams get closed after they are read once.
+def _parseJson(string) {
+    return new groovy.json.JsonSlurperClassic().parseText(string)
+}
+
+def _sysCmd(cmd, timeout) {
+    def verbose = env['PIPE_DEBUG']
+    timeout = timeout ? timeout : 5000 //default timeout 5 seconds
+
+    //Need to use StringBuilder here because the Process Streams get closed after they are read once.
     def sout = new StringBuilder(), serr = new StringBuilder()
     def proc = cmd.execute()
     proc.consumeProcessOutput(sout, serr)
-    proc.waitForOrKill(10000) //timeout here must be more than 5 seconds
+    proc.waitForOrKill(timeout)
 
     // for debugging in Jenkins' Script Console
-    println _dumpProcess(cmd, proc, sout, serr)
     if (proc.exitValue() != 0) {
-        throw new Exception(_dumpProcess(cmd, proc, sout, serr))
+        throw new Exception(_dumpProcess(cmd, proc, sout, serr, 2))
     }
+    if (verbose) {
+        println _dumpProcess(cmd, proc, sout, serr)
+    }
+    return [proc, sout, serr]
 }
+
 def _dumpProcess(cmd, p, sout, serr, verbose) {
     def s = '';
     if (verbose && verbose == 2) {
@@ -111,11 +112,14 @@ def _dumpProcess(cmd, p, sout, serr, verbose) {
         s += "STDERR:  "+serr+"\n"
         return s
     }
+    return s
 }
 
 /*
   START BUILDING !!
 */
+
+getSystemInfo()
 
 try {
     def githead    = githubGetHEAD()
@@ -129,10 +133,6 @@ try {
 }
 sendIrcMsg("Build "+env.BUILD_ID+"> ${IRCBROWN}${gitauthor} just committed '$gitmessage'. Starting build "+env.BUILD_URL+"${IRCCLEAR}")
 
-/*
-  Available environment variables, see. https://wiki.jenkins-ci.org/display/JENKINS/Building+a+software+project
-  invoke them with env.NODE_NAME
-*/
 
 scriptsDir='/opt/jenkins_ansbiletorpor_interface/'
 
