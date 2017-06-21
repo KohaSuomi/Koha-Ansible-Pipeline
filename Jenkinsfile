@@ -3,7 +3,6 @@
 import groovy.json.JsonSlurperClassic
 
 
-
 /*
   Available environment variables, see. https://wiki.jenkins-ci.org/display/JENKINS/Building+a+software+project
   invoke them with env.NODE_NAME
@@ -13,12 +12,24 @@ import groovy.json.JsonSlurperClassic
   DEFINING GLOBAL VARIABLES AND FUNCTIONS
 */
 
-/* DEBUG PARAMS */
+/* TESTING PARAMS
 
-// 2 or 1 or null
-def sysenv = System.getenv() //env is already overloaded by Jenkins and has Jenkins' own params
-sysenv['PIPE_DEBUG'] = 1
-env['PIPE_DEBUG'] = 1
+One cannot set environment variables easily in Java :(((((((
+def sysenv = System.getenv()
+println sysenv.dump()
+sysenv.put('PIPE_DEBUG',1) //No permission to do this??
+
+using closures instead...
+
+see testrun.groovy for what variables are injected in here
+*/
+def debug = System.getenv('PIPE_DEBUG')
+
+
+
+
+/* PROGRAM PATHS */
+def sendIrcMsgProgram = debug ? 'mocks/sendIrcMsg.sh' : '/usr/local/bin/sendIrcMsg.sh'
 
 
 /* GITHUB PARAMS */
@@ -35,67 +46,6 @@ def IRCBROWN = "\u000305"
 def IRCBOLD  = "\u0002"
 
 
-
-def githubGetHEAD = {
-    return _githubApiCall("$githubBaseurl/$organization/$repo/git/refs/heads/$branch")
-}
-def githubGetCommit = {
-    hash ->
-    return _githubApiCall("$githubBaseurl/$organization/$repo/git/commits/$hash")
-}
-def _githubApiCall(url) {
-    def cmd = "/usr/bin/curl --silent $url"
-    def (proc, sout, serr) = _sysCmd(cmd)
-    return _parseJson(sout.toString())
-}
-
-def getSystemInfo() {
-    def info = "System info:\n"
-
-    def cmd = "/bin/hostname"
-    def (proc, sout, serr) = _sysCmd(cmd)
-    info += 'Hostname: '+sout.toString()+"\n"
-
-    if (env['PIPE_DEBUG'] > 0) {
-        info += "Environment:\n"
-        for (String k : env) {
-            info += "$k -> "+env[k]+"\n"
-        }
-    }
-
-    println info
-}
-
-def sendIrcMsg = {
-    msg ->
-    //Don't use "" in your message
-    def cmd = "/usr/local/bin/sendIrcMsg.sh $msg"
-    _sysCmd(cmd, 10000)
-}
-
-def _parseJson(string) {
-    return new groovy.json.JsonSlurperClassic().parseText(string)
-}
-
-def _sysCmd(cmd, timeout) {
-    def verbose = env['PIPE_DEBUG']
-    timeout = timeout ? timeout : 5000 //default timeout 5 seconds
-
-    //Need to use StringBuilder here because the Process Streams get closed after they are read once.
-    def sout = new StringBuilder(), serr = new StringBuilder()
-    def proc = cmd.execute()
-    proc.consumeProcessOutput(sout, serr)
-    proc.waitForOrKill(timeout)
-
-    // for debugging in Jenkins' Script Console
-    if (proc.exitValue() != 0) {
-        throw new Exception(_dumpProcess(cmd, proc, sout, serr, 2))
-    }
-    if (verbose) {
-        println _dumpProcess(cmd, proc, sout, serr)
-    }
-    return [proc, sout, serr]
-}
 
 def _dumpProcess(cmd, p, sout, serr, verbose) {
     def s = '';
@@ -115,17 +65,83 @@ def _dumpProcess(cmd, p, sout, serr, verbose) {
     return s
 }
 
+def _sysCmd = {
+    cmd, timeout=5000 ->    //default timeout 5 seconds
+    def verbose = debug
+
+    //Need to use StringBuilder here because the Process Streams get closed after they are read once.
+    def sout = new StringBuilder(), serr = new StringBuilder()
+    def proc = cmd.execute()
+    proc.consumeProcessOutput(sout, serr)
+    proc.waitForOrKill(timeout)
+
+    // for debugging in Jenkins' Script Console
+    if (proc.exitValue() != 0) {
+        throw new Exception(_dumpProcess(cmd, proc, sout, serr, 2))
+    }
+    if (verbose) {
+        println _dumpProcess(cmd, proc, sout, serr, verbose)
+    }
+    return [proc, sout, serr]
+}
+
+def _parseJson(string) {
+    return new groovy.json.JsonSlurperClassic().parseText(string)
+}
+
+
+def _githubApiCall = {
+    url ->
+    def cmd = "/usr/bin/curl --silent $url"
+    def (proc, sout, serr) = _sysCmd(cmd, 5000)
+    return _parseJson(sout.toString())
+}
+def githubGetHEAD = {
+    return _githubApiCall("$githubBaseurl/$organization/$repo/git/refs/heads/$branch")
+}
+def githubGetCommit = {
+    hash ->
+    return _githubApiCall("$githubBaseurl/$organization/$repo/git/commits/$hash")
+}
+
+def getSystemInfo = {
+    def verbose = debug
+
+    def info = "System info:\n"
+
+    def cmd = "/bin/hostname"
+    def (proc, sout, serr) = _sysCmd(cmd, 5000)
+    info += 'Hostname: '+sout.toString()+"\n"
+
+    if (verbose > 0) {
+        info += "Environment:\n"
+        for (String k : env) {
+            info += "$k -> "+env[k]+"\n"
+        }
+    }
+
+    println info
+}
+
+def sendIrcMsg = {
+    msg ->
+    //Don't use "" in your message
+    def cmd = "$sendIrcMsgProgram $msg"
+    _sysCmd(cmd, 10000)
+}
+
 /*
   START BUILDING !!
 */
 
 getSystemInfo()
 
+def githead, gitcommit, gitmessage, gitauthor
 try {
-    def githead    = githubGetHEAD()
-    def gitcommit  = githubGetCommit(githead.object.sha)
-    def gitmessage = gitcommit.message.tokenize("\n")[0]
-    def gitauthor  = gitcommit.committer.name
+    githead    = githubGetHEAD()
+    gitcommit  = githubGetCommit(githead.object.sha)
+    gitmessage = gitcommit.message.tokenize("\n")[0]
+    gitauthor  = gitcommit.committer.name
 } catch (e) {
     currentBuild.result = 'FAILURE'
     sendIrcMsg("Build "+env.BUILD_ID+"> ${IRCRED}Trying to build but GitHub API is malfunctioning?${IRCCLEAR}: "+e.toString())
