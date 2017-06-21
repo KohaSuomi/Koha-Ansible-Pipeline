@@ -65,6 +65,24 @@ def _dumpProcess(cmd, p, sout, serr, verbose) {
     return s
 }
 
+/**
+
+Executes a shell command
+
+WARNING!
+
+Using this pattern fails in the Jenkins Groovy sandbox:
+
+    def (proc, sout, serr) = _sysCmd(cmd, 5000)
+
+Use this instead:
+
+    def rv = _sysCmd(cmd, 5000)
+    def proc = rv[0]
+    def sout = rv[1]
+    def serr = rv[2]
+
+**/
 def _sysCmd = {
     cmd, timeout=5000 ->    //default timeout 5 seconds
     def verbose = debug
@@ -93,7 +111,11 @@ def _parseJson(string) {
 def _githubApiCall = {
     url ->
     def cmd = "/usr/bin/curl --silent $url"
-    def (proc, sout, serr) = _sysCmd(cmd, 5000)
+    def rv = _sysCmd(cmd, 5000)
+    def proc = rv[0]
+    def sout = rv[1]
+    def serr = rv[2]
+
     return _parseJson(sout.toString())
 }
 def githubGetHEAD = {
@@ -110,7 +132,11 @@ def getSystemInfo = {
     def info = "System info:\n"
 
     def cmd = "/bin/hostname"
-    def (proc, sout, serr) = _sysCmd(cmd, 5000)
+    def rv = _sysCmd(cmd, 5000)
+    def proc = rv[0]
+    def sout = rv[1]
+    def serr = rv[2]
+
     info += 'Hostname: '+sout.toString()+"\n"
 
     if (verbose > 0) {
@@ -127,7 +153,10 @@ def sendIrcMsg = {
     msg ->
     //Don't use "" in your message
     def cmd = "$sendIrcMsgProgram $msg"
-    _sysCmd(cmd, 10000)
+    def rv = _sysCmd(cmd, 10000)
+    def proc = rv[0]
+    def sout = rv[1]
+    def serr = rv[2]
 }
 
 /*
