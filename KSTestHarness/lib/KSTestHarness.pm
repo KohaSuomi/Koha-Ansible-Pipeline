@@ -130,8 +130,8 @@ sub prepareTestResultDirectories {
   my ($self) = @_;
   $self->getTestResultFileAndDirectoryPaths($self->{resultsDir});
   mkdir $self->{testResultsDir} unless -d $self->{testResultsDir};
-  $self->_shell("rm", "-r $self->{junitDir}");
-  $self->_shell("rm", "-r $self->{cloverDir}");
+  $self->_shell("rm", "-r $self->{junitDir}")  if -e $self->{junitDir};
+  $self->_shell("rm", "-r $self->{cloverDir}") if -e $self->{cloverDir};
   mkdir $self->{junitDir} unless -d $self->{junitDir};
   mkdir $self->{cloverDir} unless -d $self->{cloverDir};
   unlink $self->{testResultsArchive} if -e $self->{testResultsArchive};
