@@ -17,7 +17,7 @@ Automatically sorts given test files by directory and deduplicates them.
 
 =cut
 
-use 5.22.0;
+use Modern::Perl;
 use Carp;
 use autodie;
 $Carp::Verbose = 'true'; #die with stack trace
@@ -27,6 +27,7 @@ use Try::Tiny;
 use Scalar::Util qw(blessed);
 use Cwd;
 
+use IPC::Cmd;
 use File::Basename;
 use TAP::Harness::JUnit;
 use Params::Validate qw(:all);
@@ -45,15 +46,12 @@ use Params::Validate qw(:all);
 =cut
 
 my $validationTestFilesCallbacks = {
-  'is an array' => sub {
-    return (ref($_[0]) eq 'ARRAY');
-  },
-  'not empty' => sub {
-    return scalar(@$_[0]);
-  },
   'files exist' => sub {
+    die "not an array" unless (ref($_[0]) eq 'ARRAY');
+    die "is empty" unless (scalar(@{$_[0]}));
+
     my @errors;
-    foreach my $file (@$_[0]) {
+    foreach my $file (@{$_[0]}) {
       push(@errors, "$file is not readable") unless (-r $file);
     }
     return 1 unless @errors;
@@ -61,30 +59,36 @@ my $validationTestFilesCallbacks = {
   },
 };
 my $validationNew = {
-  resultsDir => callbacks => {
-    'resultsDir is writable' => sub {
-      if ($_[0]) {
-        return (-w $_[0]);
-      }
-      else {
-        return 1 if (-w File::Basename::dirname($0));
-        die "No --results-dir was passed, so defaulting to the directory of the program used to call me '".File::Basename::dirname($0)."'. Unfortunately that directory is not writable by this process and I don't know where to save the test deliverables."
-      }
+  resultsDir => {
+    callbacks => {
+      'resultsDir is writable' => sub {
+        if ($_[0]) {
+          return (-w $_[0]);
+        }
+        else {
+          return 1 if (-w File::Basename::dirname($0));
+          die "No --results-dir was passed, so defaulting to the directory of the program used to call me '".File::Basename::dirname($0)."'. Unfortunately that directory is not writable by this process and I don't know where to save the test deliverables."
+        }
+      },
     },
   },
-  tar => 0,
-  clover => 0,
-  dryRun => 0,
+  tar => {default => 0},
+  clover => {default => 0},
+  dryRun => {default => 0},
   verbose => {default => 0},
-  testFiles => callbacks => $validationTestFilesCallbacks,
+  testFiles => {
+    callbacks => $validationTestFilesCallbacks,
+  },
 };
 sub new {
+#  $validationTestFilesCallbacks->{$_}(['/tmp']) for (keys(%$validationTestFilesCallbacks));
   my $class = shift;
-  my ($params) = validate(@_, $validationNew);
+  my $params = validate(@_, $validationNew);
 
   my $self = {};
   bless($self, $class);
   $self->{_params} = $params;
+  $self->setResultsDir( $params->{resultsDir} );
   $self->setTestFiles( $params->{testFiles} );
   return $self;
 }
@@ -92,13 +96,13 @@ sub new {
 sub run {
   my ($self) = @_;
 
-  $self->changeWorkingDir();
+#  $self->changeWorkingDir();
   $self->prepareTestResultDirectories();
-  $self->clearCoverDb() if $self->{clover};
+  $self->clearCoverDb() if $self->isClover();
   $self->runharness();
-  $self->createCoverReport() if $self->{clover};
-  $self->tar() if $self->{tar};
-  $self->revertWorkingDir();
+  $self->createCoverReport() if $self->isClover();
+  $self->tar() if $self->isTar();
+#  $self->revertWorkingDir();
 }
 
 =head2 changeWorkingDir
@@ -124,21 +128,33 @@ sub revertWorkingDir {
 
 sub prepareTestResultDirectories {
   my ($self) = @_;
-  ##Prepare directories to store test results
-  $self->{testResultsDir} = 'testResults';
-  $self->{testResultsArchive} = 'testResults.tar.gz';
-  $self->{junitDir} =  $self->{testResultsDir}.'/junit';
-  $self->{cloverDir} = $self->{testResultsDir}.'/clover';
-  $self->{cover_dbDir} = $self->{testResultsDir}.'/cover_db';
-  $self->{archivableDirs} = [$self->{junitDir}, $self->{cloverDir}];
+  $self->getTestResultFileAndDirectoryPaths($self->{resultsDir});
   mkdir $self->{testResultsDir} unless -d $self->{testResultsDir};
-  $self->_shell("rm -r $self->{junitDir}");
-  $self->_shell("rm -r $self->{cloverDir}");
+  $self->_shell("rm", "-r $self->{junitDir}");
+  $self->_shell("rm", "-r $self->{cloverDir}");
   mkdir $self->{junitDir} unless -d $self->{junitDir};
   mkdir $self->{cloverDir} unless -d $self->{cloverDir};
   unlink $self->{testResultsArchive} if -e $self->{testResultsArchive};
 }
 
+=head2 getTestResultFileAndDirectoryPaths
+@STATIC
+
+Injects paths to the given HASHRef.
+
+Used to share all relevant paths centrally with no need to duplicate
+
+=cut
+
+sub getTestResultFileAndDirectoryPaths {
+  my ($hash, $resultsDir) = @_;
+  $hash->{testResultsDir} = $resultsDir.'/testResults';
+  $hash->{testResultsArchive} = 'testResults.tar.gz';
+  $hash->{junitDir} =  $hash->{testResultsDir}.'/junit';
+  $hash->{cloverDir} = $hash->{testResultsDir}.'/clover';
+  $hash->{cover_dbDir} = $hash->{testResultsDir}.'/cover_db';
+  $hash->{archivableDirs} = [$hash->{junitDir}, $hash->{cloverDir}];
+}
 
 =head2 clearCoverDb
 
@@ -148,8 +164,7 @@ Empty previous coverage test results
 
 sub clearCoverDb {
   my ($self) = @_;
-  my $cmd = "/usr/bin/cover -delete $self->{cover_dbDir}";
-  $self->_shell($cmd);
+  $self->_shell('cover', "-delete $self->{cover_dbDir}");
 }
 
 =head2 createCoverReport
@@ -160,8 +175,7 @@ Create Clover coverage reports
 
 sub createCoverReport {
   my ($self) = @_;
-  my $cmd = "/usr/bin/cover -report clover -outputdir $self->{cloverDir} $self->{cover_dbDir}";
-  $self->_shell($cmd);
+  $self->_shell('cover', "-report clover -outputdir $self->{cloverDir} $self->{cover_dbDir}");
 }
 
 =head2 tar
@@ -172,8 +186,7 @@ Create a tar.gz-package out of test deliverables
 
 sub tar {
   my ($self) = @_;
-  my $cmd = "/bin/tar -czf $self->{testResultsArchive} @{$self->{archivableDirs}}";
-  $self->_shell($cmd);
+  $self->_shell('tar', "-czf $self->{testResultsArchive} @{$self->{archivableDirs}}");
 }
 
 =head2 runharness
@@ -196,12 +209,12 @@ sub runharness {
       my $dirToPackage = $dir;
       $dirToPackage =~ s!^\./!!; #Drop leading "current"-dir chars
       $dirToPackage =~ s!/!\.!gsm; #Change directories to dot-separated packages
-      my $xmlfile = $self->{testResultsDir}.'/junit'.'/'.$self->{dirToPackage}.'.xml';
+      my $xmlfile = $self->{testResultsDir}.'/junit'.'/'.$dirToPackage.'.xml';
       my @exec = (
           $EXECUTABLE_NAME,
           '-w',
       );
-      push(@exec, "-MDevel::Cover=-db,$self->{cover_dbDir},-silent,1,-coverage,all") if $self->{clover};
+      push(@exec, "-MDevel::Cover=-db,$self->{cover_dbDir},-silent,1,-coverage,all") if $self->isClover();
 
       if ($self->{dryRun}) {
           print "TAP::Harness::JUnit would run tests with this config:\nxmlfile => $xmlfile\npackage => $dirToPackage\nexec => @exec\ntests => @tests\n";
@@ -218,6 +231,22 @@ sub runharness {
           $harness->runtests(@tests);
       }
   }
+}
+
+sub isClover {
+  return shift->{_params}->{clover};
+}
+sub isTar {
+  return shift->{_params}->{tar};
+}
+sub verbosity {
+  return shift->{_params}->{verbose};
+}
+
+sub setResultsDir {
+  my ($self, $resultsDir) = @_;
+
+  $self->{resultsDir} = $self->{_params}->{resultsDir} || Cwd::getcwd();
 }
 
 sub setTestFiles {
@@ -249,19 +278,23 @@ sub _sortFilesByDir {
 }
 
 sub _shell {
-  my ($self, @cmd) = @_;
+  my ($self, $program, @params) = @_;
+  my $programPath = IPC::Cmd::can_run($program) or die "$program is not installed!";
+  my $cmd = "$programPath @params";
+
   if ($self->{dryRun}) {
-    print "@cmd\n";
+    print "$cmd\n";
   }
   else {
-    my $rv = `@cmd`;
+    my( $success, $error_message, $full_buf, $stdout_buf, $stderr_buf ) =
+        IPC::Cmd::run( command => $cmd, verbose => 0 );
     my $exitCode = ${^CHILD_ERROR_NATIVE} >> 8;
     my $killSignal = ${^CHILD_ERROR_NATIVE} & 127;
     my $coreDumpTriggered = ${^CHILD_ERROR_NATIVE} & 128;
-    warn "Shell command: @cmd\n  exited with code '$exitCode'. Killed by signal '$killSignal'.".(($coreDumpTriggered) ? ' Core dumped.' : '')."\n  STDOUT: $rv\n"
+    die "Shell command: $cmd\n  exited with code '$exitCode'. Killed by signal '$killSignal'.".(($coreDumpTriggered) ? ' Core dumped.' : '')."\nERROR MESSAGE: $error_message\nSTDOUT:\n@$stdout_buf\nSTDERR:\n@$stderr_buf\nCWD:".Cwd::getcwd()
         if $exitCode != 0;
-    print "@cmd\n$rv\n" if $rv && $self->{verbose} > 0;
-    return $rv;
+    print "CMD: $cmd\nERROR MESSAGE: $error_message\nSTDOUT:\n@$stdout_buf\nSTDERR:\n@$stderr_buf\nCWD:".Cwd::getcwd() if $self->verbosity() > 0;
+    return "@$full_buf";
   }
 }
 

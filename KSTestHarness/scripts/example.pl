@@ -1,11 +1,11 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # Copyright 2017 KohaSuomi
 #
 # This file is part of Koha-Ansible-Pipeline.
 #
 
-use 5.22.0;
+use Modern::Perl;
 use Carp;
 use autodie;
 $Carp::Verbose = 'true'; #die with stack trace
@@ -13,6 +13,8 @@ use English; #Use verbose alternatives for perl's strange $0 and $\ etc.
 use Getopt::Long qw(:config no_ignore_case);
 use Try::Tiny;
 use Scalar::Util qw(blessed);
+
+use KSTestHarness;
 
 my ($help, $dryRun);
 my ($verbose) = (0);
@@ -84,31 +86,28 @@ sub run {
 
     print "Selected the following test files:\n".join("\n",@tests)."\n" if $verbose;
 
-    my $ksTestHarness = KSTestHarness->new({
+    my $ksTestHarness = KSTestHarness->new(
         resultsDir => $resultsDir,
         tar        => $tar,
         clover     => $clover,
         testFiles  => \@tests,
         dryRun     => $dryRun,
         verbose    => $verbose,
-    });
+    );
     $ksTestHarness->run();
 }
 
 sub _getAllTests {
-    return _getTests('.', '*.t');
+    return _getTests('t/t', '*.t');
 }
 sub _getUnitTests {
-    return _getTests('t', '*.t', 1); #maxdepth 1
+    return 't/t/01-unit.t';
 }
 sub _getXTTests {
-    return _getTests('xt', '*.t');
-}
-sub _getSIPTests {
-    return _getTests('C4/SIP/t', '*.t');
+    return 't/t/xt/02-xt.t';
 }
 sub _getDbDependentTests {
-    return _getTests('t/db_dependent', '*.t');
+    return 't/t/integration/03-integration.t';
 }
 sub _getTests {
     my ($dir, $selector, $maxDepth) = @_;
