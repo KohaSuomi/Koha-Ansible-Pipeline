@@ -1,23 +1,18 @@
 # Koha-Ansible-Pipeline
-Jenkins Build Pipeline as code, Jenkins loads the build instructions from this repo
 
-Jenkinsfile is the default name for the file Jenkins looks for for the build instructions.
+Contains modules to interface with underlying tools and programs that are needed
+to do continuous delivery (CD) with our Koha+Ansible+AnsbileTorpor+Jenkins -toolchain.
 
-h2. INSTALL
+See
+https://tiketti.koha-suomi.fi:83/projects/smd/wiki/Koha-Suomi_services#Jenkins2-and-Continuous-Delivery-via-AnsbileTorpor
 
-1. Configure a Pipeline build job to get that build code from this SCM.
-2. Test by triggering the build manually
+## Jenkins Build Pipeline for Koha
 
-3. Configure GitHub to do remote build execution on Git post-commit hook.
-   https://help.github.com/articles/about-webhooks/
+Jenkins Build Pipeline as code, Jenkins should load the build instructions from this directory
 
-   Make this build listen for remote build triggers, using the "Trigger build remotely (e.g. from sripts)".
-   Actually you put this remote listen url to the GitHub post-commit hook url target.
-4. Test by pushing jiggly puff into your SCM
+## Koha-Suomi Test Harness
 
-
-
-h2. TESTING
-
-    bash -x run.sh
+Harness the power of clover and junit in one easy to use wrapper.
+Simply give a list of test files to execute and he will take care of all the configuration hassle to get Clover and Junit
+working with Perl.
 
