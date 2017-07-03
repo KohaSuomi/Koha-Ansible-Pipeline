@@ -35,12 +35,14 @@ use Params::Validate qw(:all);
 =head2 new
 
 @PARAMS HashRef: {
-          resultsDir =>
-          tar        =>
-          clover     =>
-          testFiles  =>
-          dryRun     =>
-          verbose    =>
+          resultsDir => String of a directory, must be writable. Where the test deliverables are brought
+          tar        => Boolean
+          clover     => Boolean
+          junit      => Boolean
+          testFiles  => ARRAYRef, list of files to test
+          dryRun     => Boolean
+          verbose    => Integer
+          lib        => ARRAYRef or undef, list of extra include directories for the test files
         }
 
 =cut
@@ -74,8 +76,23 @@ my $validationNew = {
   },
   tar => {default => 0},
   clover => {default => 0},
+  junit  => {default => 0},
   dryRun => {default => 0},
   verbose => {default => 0},
+  lib     => {
+    default => [],
+    callbacks => {
+      'lib is an array or undef' => sub {
+        return 1 unless ($_[0]);
+        if (ref($_[0]) eq 'ARRAY') {
+          return 1;
+        }
+        else {
+          die "param lib is not an array";
+        }
+      },
+    },
+  },
   testFiles => {
     callbacks => $validationTestFilesCallbacks,
   },
@@ -200,47 +217,64 @@ sub runharness {
   my $filesByDir = $self->{testFilesByDir};
 
   foreach my $dir (sort keys %$filesByDir) {
-      my @tests = sort @{$filesByDir->{$dir}};
-      unless (scalar(@tests)) {
-          carp "\@tests is empty?";
-      }
+    my @tests = sort @{$filesByDir->{$dir}};
+    unless (scalar(@tests)) {
+        carp "\@tests is empty?";
+    }
+    ##Prepare test harness params
+    my $dirToPackage = $dir;
+    $dirToPackage =~ s!^\./!!; #Drop leading "current"-dir chars
+    $dirToPackage =~ s!/!\.!gsm; #Change directories to dot-separated packages
+    my $xmlfile = $self->{testResultsDir}.'/junit'.'/'.$dirToPackage.'.xml';
+    my @exec = (
+        $EXECUTABLE_NAME,
+        '-w',
+    );
+    push(@exec, "-MDevel::Cover=-db,$self->{cover_dbDir},-silent,1,-coverage,all") if $self->isClover();
+    foreach my $lib (@{$self->lib}) {
+      push(@exec, "-I$lib");
+    }
 
-      ##Prepare test harness params
-      my $dirToPackage = $dir;
-      $dirToPackage =~ s!^\./!!; #Drop leading "current"-dir chars
-      $dirToPackage =~ s!/!\.!gsm; #Change directories to dot-separated packages
-      my $xmlfile = $self->{testResultsDir}.'/junit'.'/'.$dirToPackage.'.xml';
-      my @exec = (
-          $EXECUTABLE_NAME,
-          '-w',
-      );
-      push(@exec, "-MDevel::Cover=-db,$self->{cover_dbDir},-silent,1,-coverage,all") if $self->isClover();
-
-      if ($self->{dryRun}) {
-          print "TAP::Harness::JUnit would run tests with this config:\nxmlfile => $xmlfile\npackage => $dirToPackage\nexec => @exec\ntests => @tests\n";
+    if ($self->{dryRun}) {
+        print "TAP::Harness::JUnit would run tests with this config:\nxmlfile => $xmlfile\npackage => $dirToPackage\nexec => @exec\ntests => @tests\n";
+    }
+    else {
+      my $harness;
+      if ($self->isJunit()) {
+        $harness = TAP::Harness::JUnit->new({
+            xmlfile => $xmlfile,
+            package => "",
+            verbosity => $self->verbosity(),
+            namemangle => 'perl',
+            exec       => \@exec,
+        });
+        $harness->runtests(@tests);
       }
       else {
-          my $harness = TAP::Harness::JUnit->new({
-              xmlfile => $xmlfile,
-#                package => $dirToPackage,
-              package => "",
-              verbosity => 1,
-              namemangle => 'perl',
-              exec       => \@exec,
-          });
-          $harness->runtests(@tests);
+        $harness = TAP::Harness->new({
+            verbosity => $self->verbosity(),
+            exec       => \@exec,
+        });
+        $harness->runtests(@tests);
       }
+    }
   }
 }
 
 sub isClover {
   return shift->{_params}->{clover};
 }
+sub isJunit {
+  return shift->{_params}->{junit};
+}
 sub isTar {
   return shift->{_params}->{tar};
 }
 sub verbosity {
   return shift->{_params}->{verbose};
+}
+sub lib {
+  return shift->{_params}->{lib};
 }
 
 sub setResultsDir {
@@ -293,7 +327,7 @@ sub _shell {
     my $coreDumpTriggered = ${^CHILD_ERROR_NATIVE} & 128;
     die "Shell command: $cmd\n  exited with code '$exitCode'. Killed by signal '$killSignal'.".(($coreDumpTriggered) ? ' Core dumped.' : '')."\nERROR MESSAGE: $error_message\nSTDOUT:\n@$stdout_buf\nSTDERR:\n@$stderr_buf\nCWD:".Cwd::getcwd()
         if $exitCode != 0;
-    print "CMD: $cmd\nERROR MESSAGE: $error_message\nSTDOUT:\n@$stdout_buf\nSTDERR:\n@$stderr_buf\nCWD:".Cwd::getcwd() if $self->verbosity() > 0;
+    print "CMD: $cmd\nERROR MESSAGE: ".($error_message // '')."\nSTDOUT:\n@$stdout_buf\nSTDERR:\n@$stderr_buf\nCWD:".Cwd::getcwd() if $self->verbosity() > 0;
     return "@$full_buf";
   }
 }

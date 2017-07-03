@@ -18,8 +18,9 @@ use KSTestHarness;
 
 my ($help, $dryRun);
 my ($verbose) = (0);
-my ($clover, $tar, $resultsDir);
+my ($clover, $junit, $tar, $resultsDir);
 my ($testAll, $testUnit, $testXt, $testDb);
+my @includes;
 
 
 GetOptions(
@@ -28,7 +29,9 @@ GetOptions(
     'dry-run'                     => \$dryRun,
     'results-dir=s'               => \$resultsDir,
     'clover'                      => \$clover,
+    'junit'                       => \$junit,
     'tar'                         => \$tar,
+    'l|lib:s'                     => \@includes,
     'a|all'                       => \$testAll,
     'u|unit'                      => \$testUnit,
     'x|xt'                        => \$testXt,
@@ -51,6 +54,13 @@ Runs a ton of tests with other metrics if needed
 
   --clover              Run Devel::Cover and output Clover-reports
 
+  --junit               Run test using TAP::Harness::Junit instead of TAP::Harness and output junit xml-files
+                        under --results-dir
+
+  -l --lib              Extra include directories to pass to the test harness.
+                        Same as perl -Ilib
+                        Can be repeated.
+
   -a --all              Run all tests.
 
   -u --unit             Unit tests t/*.t
@@ -67,7 +77,7 @@ EXAMPLE
     example.pl --all --tar --clover
 
     ##If you are interested in unit tests and db tests only...
-    example.pl --unit --db -v 1
+    example.pl --unit --db -v 1 -l lib -l t/lib
 
 USAGE
 
@@ -90,6 +100,7 @@ sub run {
         resultsDir => $resultsDir,
         tar        => $tar,
         clover     => $clover,
+        junit      => $junit,
         testFiles  => \@tests,
         dryRun     => $dryRun,
         verbose    => $verbose,

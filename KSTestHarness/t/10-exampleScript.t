@@ -17,7 +17,7 @@ my $p = {};
 KSTestHarness::getTestResultFileAndDirectoryPaths($p, $testResultsDir);
 
 subtest "Execute example script", sub {
-  my $cmd = "/usr/bin/perl -Ilib scripts/example.pl --clover --tar --all --results-dir $testResultsDir";
+  my $cmd = "/usr/bin/perl -Ilib scripts/example.pl --clover --tar --all --junit --results-dir $testResultsDir";
   my( $success, $error_message, $full_buf, $stdout_buf, $stderr_buf ) =
           IPC::Cmd::run( command => $cmd, verbose => 0 );
   if ($ENV{TEST_VERBOSE}) {
