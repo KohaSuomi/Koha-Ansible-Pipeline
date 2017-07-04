@@ -170,7 +170,6 @@ sub getTestResultFileAndDirectoryPaths {
   $hash->{junitDir} =  $hash->{testResultsDir}.'/junit';
   $hash->{cloverDir} = $hash->{testResultsDir}.'/clover';
   $hash->{cover_dbDir} = $hash->{testResultsDir}.'/cover_db';
-  $hash->{archivableDirs} = [$hash->{junitDir}, $hash->{cloverDir}];
 }
 
 =head2 clearCoverDb
@@ -198,12 +197,26 @@ sub createCoverReport {
 =head2 tar
 
 Create a tar.gz-package out of test deliverables
+Package contains
+
+  testResults/clover/clover.xml
+  testResults/junit/*.xml
 
 =cut
 
 sub tar {
   my ($self) = @_;
-  $self->_shell('tar', "-czf $self->{testResultsArchive} @{$self->{archivableDirs}}");
+  my $baseDir = $self->{resultsDir};
+
+  #Choose directories that need archiving
+  my @archivable;
+  push(@archivable, $self->{junitDir}) if $self->isJunit;
+  push(@archivable, $self->{cloverDir}) if $self->isClover;
+  my @dirs = map { my $a = $_; $a =~ s/\Q$baseDir\E\/?//; $a;} @archivable; #Change absolute path to relative
+  my $cwd = Cwd::getcwd();
+  chdir $baseDir;
+  $self->_shell("tar", "-czf $self->{testResultsArchive} @dirs");
+  chdir $cwd;
 }
 
 =head2 runharness
