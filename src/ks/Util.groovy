@@ -106,4 +106,21 @@ class Util implements Serializable {
     }
     return s
   }
+
+  String emailToUsername(String email) {
+    switch(email) {
+      case "olli-antti.kivilahti@jns.fi":
+        return "kivilahtio"
+        break
+      case "lari.taskula@jns.fi":
+        return "lari"
+        break
+      case "johanna.raisa@mikkeli.fi":
+        return "jraisa"
+        break
+      case "pasi.korkalo@oulu.fi":
+        return "janPasi"
+        break
+    }
+  }
 }

@@ -37,8 +37,7 @@ println "********************"
 
 def gitcommit = ks.gh.getLatestCommit()
 
-println gitcommit.title
-println gitcommit.author
+println gitcommit
 println ""
 
 /* IRC */
@@ -54,5 +53,12 @@ println "**************************************"
 println "*ks.ansbileTorporInterfaceScriptPath:*"
 println "**************************************"
 println ks.ansbileTorporInterfaceScriptPath
+println ""
+
+println "*************************************************"
+println "*ks.emailToUsername('johanna.raisa@mikkeli.fi'):*"
+println "*************************************************"
+println ks.emailToUsername("johanna.raisa@mikkeli.fi")
+assert ks.emailToUsername("johanna.raisa@mikkeli.fi") == 'jraisa'
 println ""
 
