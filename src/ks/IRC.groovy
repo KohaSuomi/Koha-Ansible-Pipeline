@@ -48,7 +48,7 @@ class IRC implements Serializable {
 
   void sendIrcMsg(String msg) {
     def cmd = "$sendIrcMsgProgram $msg"
-    def rv = ks.sysCmd(cmd, 5000)
+    def rv = ks.sysCmd(cmd, 10000)
     def proc = rv[0]
     def sout = rv[1]
     def serr = rv[2]
