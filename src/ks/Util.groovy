@@ -118,6 +118,9 @@ class Util implements Serializable {
       case "johanna.raisa@mikkeli.fi":
         return "jraisa"
         break
+      case "johanna.raisa@gmail.com":
+        return "jraisa"
+        break
       case "pasi.korkalo@oulu.fi":
         return "janPasi"
         break
