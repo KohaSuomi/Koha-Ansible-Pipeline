@@ -78,7 +78,7 @@ class IRC implements Serializable {
   void sendIrcMsgPipelineStageSuccess(String stageName) {
     if (verbose > 0) {
       def gitcommit = ks.gh.getLatestCommit()
-      sendIrcMsg(ks.emailToUsername(gitcommit.committer.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName ${IRCGREEN}${IRCBOLD}"+ks.currentBuild.result+"${IRCCLEAR}")
+      sendIrcMsg(ks.emailToUsername(gitcommit.committer.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName ${IRCGREEN}${IRCBOLD}"+(ks.currentBuild.result ?: "SUCCESS")+"${IRCCLEAR}")
     }
   }
 
