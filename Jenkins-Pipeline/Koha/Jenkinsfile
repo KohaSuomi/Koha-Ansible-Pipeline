@@ -1,0 +1,129 @@
+#!groovy
+
+import groovy.json.JsonSlurperClassic
+
+@Library('ks-util')
+import ks.Util
+
+def verbosity = 0
+
+/*
+  Set global variables
+*/
+
+/* GITHUB PARAMS */
+def gitconnection = [:]
+gitconnection.baseurl =      "https://api.github.com/repos"
+gitconnection.organization = "KohaSuomi"
+gitconnection.repo =         "Koha"
+gitconnection.branch =       "ks-rumble"
+
+ks.Util ks = new ks.Util(gitconnection, env, currentBuild, verbosity)
+
+/*
+  Available environment variables, see. https://wiki.jenkins-ci.org/display/JENKINS/Building+a+software+project
+  invoke them with env.NODE_NAME
+*/
+
+
+
+ks.irc.sendIrcMsgPipelineStarted()
+stage('Deploy testing') {
+    def stageName = "Deploy testing"
+    node {
+        try {
+            ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+
+            sh ks.ansbileTorporInterfaceScriptPath + " deploy koha_ci_"+(Integer.parseInt(env.EXECUTOR_NUMBER)+1)
+
+            ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+
+        } catch(e) {
+            ks.currentBuild.result = 'FAILURE'
+            ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+            throw e
+        }
+    }
+}
+
+stage('Git tests') {
+    def stageName = "Git tests"
+    node {
+        try {
+            ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+
+            sh ks.ansbileTorporInterfaceScriptPath + " testgit koha_ci_"+(Integer.parseInt(env.EXECUTOR_NUMBER)+1)
+
+            junit keepLongStdio: true, testResults: '**/testResults/junit/*.xml'
+
+            step([
+                $class: 'CloverPublisher',
+                cloverReportDir: "testResults/clover",
+                cloverReportFileName: 'clover.xml',
+                healthyTarget: [methodCoverage: 70, conditionalCoverage: 80, statementCoverage: 80], // optional, default is: method=70, conditional=80, statement=80
+                unhealthyTarget: [methodCoverage: 50, conditionalCoverage: 50, statementCoverage: 50], // optional, default is none
+                failingTarget: [methodCoverage: 0, conditionalCoverage: 0, statementCoverage: 0]     // optional, default is none
+            ])
+
+            ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+
+        } catch(e) {
+            ks.currentBuild.result = 'FAILURE'
+            ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+            throw e
+        }
+    }
+}
+
+stage('All tests') {
+    def stageName = "All tests"
+    node {
+        try {
+            ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+
+            sh ks.ansbileTorporInterfaceScriptPath + " testall koha_ci_"+(Integer.parseInt(env.EXECUTOR_NUMBER)+1)
+
+            junit keepLongStdio: true, testResults: '**/testResults/junit/*.xml'
+
+            step([
+                $class: 'CloverPublisher',
+                cloverReportDir: "testResults/clover",
+                cloverReportFileName: 'clover.xml',
+                healthyTarget: [methodCoverage: 70, conditionalCoverage: 80, statementCoverage: 80], // optional, default is: method=70, conditional=80, statement=80
+                unhealthyTarget: [methodCoverage: 50, conditionalCoverage: 50, statementCoverage: 50], // optional, default is none
+                failingTarget: [methodCoverage: 0, conditionalCoverage: 0, statementCoverage: 0]     // optional, default is none
+            ])
+
+            ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+
+        } catch(e) {
+            ks.currentBuild.result = 'FAILURE'
+            ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+            throw e
+        }
+    }
+}
+
+stage('Deploy production') {
+    def stageName = "Deploy production"
+    lock('deploy-to-production') { //Only one executor can deploy to prod at once
+        node {
+            try {
+                ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+    
+                sh ks.ansbileTorporInterfaceScriptPath + " deploy koha_ci_*"
+    
+                ks.currentBuild.result = 'SUCCESS'
+    
+                ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+                ks.irc.sendIrcMsgPipelineSuccess()
+    
+            } catch(e) {
+                ks.currentBuild.result = 'FAILURE'
+                ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+                throw e
+            }
+        }
+    }
+}
+
