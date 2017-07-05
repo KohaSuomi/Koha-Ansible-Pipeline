@@ -48,13 +48,7 @@ echo "- Current user: "$(whoami)
 echo "- Date "$(date +$ymdhms)
 echo ""
 
-test -z $WORKSPACE && exceptionJenkinsEnvNotSet "WORKSPACE"
-
-###########################
-## Cleanup previous runs ##
-###########################
-
-test -e $inventory_hostname && mv $inventory_hostname ${inventory_hostname}$(date +$ymdhms)
+test -z "$WORKSPACE" && exceptionJenkinsEnvNotSet "WORKSPACE"
 
 #############################
 ## Exception handlers here ##
