@@ -21,7 +21,7 @@ class Util implements Serializable {
   public def env
   public def currentBuild
 
-  public String ansbileTorporInterfaceScriptPath = '/opt/Koha-Ansible-Pipeline/Jenkins-Pipeline/'
+  public String ansbileTorporInterfaceScriptPath = '/opt/Koha-Ansible-Pipeline/Jenkins-Pipeline/jenkinsToAnsbileTorporInterface.sh'
 
   /**
 
