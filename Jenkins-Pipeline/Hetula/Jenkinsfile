@@ -5,7 +5,7 @@ import groovy.json.JsonSlurperClassic
 @Library('ks-util')
 import ks.Util
 
-def verbosity = 2
+def verbosity = 0
 
 /*
   Set global variables
@@ -84,9 +84,10 @@ stage('Deploy production') {
 
             sh ks.ansbileTorporInterfaceScriptPath + " deploy hetula"
 
-            currentBuild.result = 'SUCCESS'
+            ks.currentBuild.result = 'SUCCESS'
 
             ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+            ks.irc.sendIrcMsgPipelineSuccess()
 
         } catch(e) {
             ks.currentBuild.result = 'FAILURE'
