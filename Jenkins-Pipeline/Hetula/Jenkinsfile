@@ -1,0 +1,98 @@
+#!groovy
+
+import groovy.json.JsonSlurperClassic
+
+@Library('ks-util')
+import ks.Util
+
+def verbosity = 2
+
+/*
+  Set global variables
+*/
+
+/* GITHUB PARAMS */
+def gitconnection = [:]
+gitconnection.baseurl = "https://api.github.com/repos"
+gitconnection.organization = "KohaSuomi"
+gitconnection.repo = "Hetula"
+gitconnection.branch = "master"
+
+ks.Util ks = new ks.Util(gitconnection, env, currentBuild, verbosity)
+
+/*
+  Available environment variables, see. https://wiki.jenkins-ci.org/display/JENKINS/Building+a+software+project
+  invoke them with env.NODE_NAME
+*/
+
+
+ks.irc.sendIrcMsgPipelineStarted()
+
+stage('Deploy testing') {
+    def stageName = "Deploy testing"
+    node('master') {
+
+        try {
+            ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+
+            sh ks.ansbileTorporInterfaceScriptPath + " deploy hetula_ci"
+
+            ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+
+        } catch(e) {
+            ks.currentBuild.result = 'FAILURE'
+            ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+            throw e
+        }
+    }
+}
+
+stage('Tests') {
+    def stageName = "Tests"
+    node('master') {
+        try {
+            ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+
+            sh ks.ansbileTorporInterfaceScriptPath + " test hetula_ci"
+
+            junit keepLongStdio: true, testResults: '**/testResults/junit/*.xml'
+
+            step([
+                $class: 'CloverPublisher',
+                cloverReportDir: "testResults/clover",
+                cloverReportFileName: 'clover.xml',
+                healthyTarget: [methodCoverage: 70, conditionalCoverage: 80, statementCoverage: 80], // optional, default is: method=70, conditional=80, statement=80
+                unhealthyTarget: [methodCoverage: 50, conditionalCoverage: 50, statementCoverage: 50], // optional, default is none
+                failingTarget: [methodCoverage: 0, conditionalCoverage: 0, statementCoverage: 0]     // optional, default is none
+            ])
+
+            ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+
+        } catch(e) {
+            ks.currentBuild.result = 'FAILURE'
+            ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+            throw e
+        }
+    }
+}
+
+stage('Deploy production') {
+    def stageName = "Deploy production"
+    node('master') {
+        try {
+            ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+
+            sh ks.ansbileTorporInterfaceScriptPath + " deploy hetula"
+
+            currentBuild.result = 'SUCCESS'
+
+            ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+
+        } catch(e) {
+            ks.currentBuild.result = 'FAILURE'
+            ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+            throw e
+        }
+    }
+}
+

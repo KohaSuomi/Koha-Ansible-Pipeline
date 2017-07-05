@@ -15,6 +15,12 @@ https://stackoverflow.com/questions/7421993/how-to-list-all-binding-variables-wi
 
 **/
 
+/* CHECK ENVIRONMENT */
+if (System.getenv()['PROJECT'] == null) {
+  System.err.println("Environment variable PROJECT is not set. Don't know which Jenkinsfile to test?")
+  System.exit(2)
+}
+
 
 /*
   SET THE JENKINS ENVIRONMENT
@@ -40,7 +46,7 @@ Binding bindings = [
 */
 
 GroovyShell gs = new GroovyShell()
-Script script = gs.parse(new File('Jenkinsfile')) //Compile the script, and make it ready to run
+Script script = gs.parse(new File(System.getenv()['PROJECT']+'/Jenkinsfile')) //Compile the script, and make it ready to run
 script.setBinding(bindings)
 
 /*

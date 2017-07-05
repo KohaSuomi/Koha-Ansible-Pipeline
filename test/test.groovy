@@ -11,6 +11,7 @@ if (! System.getenv()['MODE'] == 'testing') {
 def jenv = [:]
 jenv.BUILD_ID = 1000
 jenv.BUILD_URL = "http://example.com/build_url"
+jenv.EXECUTOR_NUMBER = 2
 
 def currentBuild = [:]
 currentBuild.result = 'FAILURE'
