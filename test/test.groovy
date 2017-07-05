@@ -13,6 +13,7 @@ jenv.BUILD_ID = 1000
 jenv.BUILD_URL = "http://example.com/build_url"
 
 def currentBuild = [:]
+currentBuild.result = 'FAILURE'
 
 def verbose = 2
 
@@ -28,12 +29,29 @@ gitconnection.branch = "master"
 /* <!START TESTING!> */
 ks.Util ks = new ks.Util(gitconnection, jenv, currentBuild, verbose)
 
+/* GIT */
+println "********************"
+println "*Newest git commit:*"
+println "********************"
+
 def gitcommit = ks.gh.getLatestCommit()
 
-println "Newest git commit:"
 println gitcommit.title
 println gitcommit.author
 println ""
 
-ks.sendIrcMsg("Jenkins Pipeline IRC test")
+/* IRC */
+println "****************"
+println "*IRC notifiers:*"
+println "****************"
+
+ks.irc.sendIrcMsg("Jenkins Pipeline IRC test")
+
+ks.irc.sendIrcMsgPipelineStageFailure("badStage", new Exception("badStage test exception"))
+
+println "**************************************"
+println "*ks.ansbileTorporInterfaceScriptPath:*"
+println "**************************************"
+println ks.ansbileTorporInterfaceScriptPath
+println ""
 

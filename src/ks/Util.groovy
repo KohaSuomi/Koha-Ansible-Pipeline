@@ -17,16 +17,11 @@ class Util implements Serializable {
   Integer verbose = 2
 
   public ks.GitHub gh
+  public ks.IRC irc
   public def env
   public def currentBuild
 
-  /* IRC MODIFIERS see. https://github.com/myano/jenni/wiki/IRC-String-Formatting*/
-  def IRCCLEAR = "\u000F"
-  def IRCRED   = "\u000304"
-  def IRCGREEN = "\u000303"
-  def IRCBROWN = "\u000305"
-  def IRCBOLD  = "\u0002"
-
+  public String ansbileTorporInterfaceScriptPath = '/opt/Koha-Ansible-Pipeline/Jenkins-Pipeline/'
 
   /**
 
@@ -41,6 +36,7 @@ class Util implements Serializable {
     this.currentBuild = currentBuild
     this.verbose = verbosity
     this.gh = new ks.GitHub(gitconnection, this, this.verbose)
+    this.irc = new ks.IRC(this, this.verbose)
   }
 
   public void setGitHubApi(ks.GitHub gh) {
@@ -52,25 +48,6 @@ class Util implements Serializable {
     Don't use "" in your message
 
   **/
-
-  void sendIrcMsg(String msg) {
-    def sendIrcMsgProgram = System.getenv()['MODE'] == 'testing' ? \
-                            'test/mocks/sendIrcMsg.sh' : '/usr/local/bin/sendIrcMsg.sh'
-    def cmd = "$sendIrcMsgProgram $msg"
-    def rv = sysCmd(cmd, 10000)
-    def proc = rv[0]
-    def sout = rv[1]
-    def serr = rv[2]
-  }
-
-  void sendIrcMsgPipelineStarted() {
-    def gitcommit = gh.getLatestCommit()
-    sendIrcMsg("Build "+env.BUILD_ID+"> ${IRCBROWN}${gitcommit.author} just committed '${gitcommit.message}'. Starting build "+env.BUILD_URL+"${IRCCLEAR}")
-  }
-
-  void sendIrcMsgGitHubMalfunction(Exception e) {
-    sendIrcMsg("Build "+env.BUILD_ID+"> ${IRCRED}Trying to build but GitHub API is malfunctioning?${IRCCLEAR}: "+e.toString())
-  }
 
 /**
 

@@ -1,4 +1,5 @@
 #!/bin/bash
 
-echo "$1"
+echo "I was invoked with params:"
+echo "$@"
 
