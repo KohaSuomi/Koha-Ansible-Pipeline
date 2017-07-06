@@ -50,6 +50,13 @@ echo ""
 
 test -z "$WORKSPACE" && exceptionJenkinsEnvNotSet "WORKSPACE"
 
+#########
+## Cleanup previous builds
+#########
+
+test -e "$testResultsArchive" && rm "$testResultsArchive"
+test -e "testResults" && rm -r "testResults"
+
 #############################
 ## Exception handlers here ##
 #############################
