@@ -104,6 +104,7 @@ my $validationNew = {
   dbPort => {default => undef},
   dbDatabase => {default => undef},
   dbSocket => {default => undef},
+  dbDiffIgnoreTables => {default => undef}
 };
 sub new {
 #  $validationTestFilesCallbacks->{$_}(['/tmp']) for (keys(%$validationTestFilesCallbacks));
@@ -396,6 +397,13 @@ sub databaseDiff {
         $diff =~ s/(?!^.*INSERT INTO .*$)^.+//mg;
         $diff =~ s/^\n*//mg;
         @tables = $diff =~ /^INSERT INTO `(.*)`/mg; # Collect names of tables
+        if ($self->{_params}->{dbDiffIgnoreTables}) {
+          foreach my $table (@{$self->{_params}->{dbDiffIgnoreTables}}) {
+            if (grep(/$table/, @tables)) {
+              @tables = grep { $_ ne $table } @tables;
+            }
+          }
+        }
         if (@tables) {
             if ($params->{parser}) {
               $self->_add_failed_test_dynamically(
