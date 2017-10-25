@@ -35,7 +35,7 @@ println "********************************"
 println "*Newest git commit from Hetula:*"
 println "********************************"
 
-def gitcommit = ks.gh.getLatestCommit()
+def gitcommit = ks.gh.getNewestCommit('master')
 
 println gitcommit
 println ""
@@ -47,12 +47,16 @@ println "*************************************************************"
 gitconnection.repo = "Koha-translations"
 ks.Util ks_translations = new ks.Util(gitconnection, jenv, currentBuild, verbose)
 
-def inMaster =     ks_translations.gh.isCommitInBranch('master')
-def inTesting =    ks_translations.gh.isCommitInBranch('testing')
-def inProduction = ks_translations.gh.isCommitInBranch('production')
+gitcommit = ks_translations.gh.getNewestCommit()
+
+def inMaster =     ks_translations.gh.isCommitInBranch(gitcommit, 'master')
+def inTesting =    ks_translations.gh.isCommitInBranch(gitcommit, 'testing')
+def inProduction = ks_translations.gh.isCommitInBranch(gitcommit, 'production')
 
 println "inMaster: $inMaster, inTesting: $inTesting, inProduction: $inProduction"
 println ""
+
+ks.setCommitToBuild( gitcommit, 'master' );
 
 /* IRC */
 println "****************"

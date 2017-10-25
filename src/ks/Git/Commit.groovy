@@ -1,4 +1,4 @@
-package ks.Git.Commit
+package ks.Git
 
 /**
 
@@ -11,7 +11,7 @@ class Commit implements Serializable {
   public String sha
   public String title
   public String author
-  public string email
+  public String email
 
   Commit(String sha, String title, String author, String email) {
     this.sha = sha
@@ -21,12 +21,14 @@ class Commit implements Serializable {
   }
   Commit(def commit) {
     this.sha = commit.sha
-    if (! commit?.sha || ! commit?.message || ! commit?.committer?.name || ! commit?.committer?.email) {
+    if (! commit?.sha || ! commit?.message ||
+        ! (commit?.committer?.name || commit?.author?.name) ||
+        ! (commit?.committer?.email || commit?.author?.email)) {
       throw new Exception("Cannot instantiate a Commit-object from input. Input dump:\n$commit")
     }
     this.title = commit.message.tokenize("\n")[0]
-    this.author = commit.committer.name
-    this.email = commit.committer.email
+    this.author = commit?.committer?.name  ? commit.committer.name  : commit.author.name
+    this.email =  commit?.committer?.email ? commit.committer.email : commit.author.email
   }
 }
 
