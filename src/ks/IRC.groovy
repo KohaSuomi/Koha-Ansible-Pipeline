@@ -56,43 +56,43 @@ class IRC implements Serializable {
 
   void sendIrcMsgPipelineStarted() {
     //if (verbose > 0) {
-      def gitcommit = ks.gh.getLatestCommit()
-      sendIrcMsg(ks.emailToUsername(gitcommit.committer.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> ${gitcommit.author} just committed '${gitcommit.title}'. Starting pipeline "+ks.env.BUILD_URL+"${IRCCLEAR}")
+      def gitcommit = ks.commitToBuild
+      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> ${gitcommit.author} just committed '${gitcommit.title}'. Starting pipeline "+ks.env.BUILD_URL+"${IRCCLEAR}")
     //}
   }
 
   void sendIrcMsgGitHubMalfunction(Exception e) {
     //if (verbose > 0) {
-      def gitcommit = ks.gh.getLatestCommit()
-      sendIrcMsg(ks.emailToUsername(gitcommit.committer.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> ${IRCRED}Trying to build but GitHub API is malfunctioning?${IRCCLEAR}: "+e.toString())
+      def gitcommit = ks.commitToBuild
+      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> ${IRCRED}Trying to build but GitHub API is malfunctioning?${IRCCLEAR}: "+e.toString())
     //}
   }
 
   void sendIrcMsgPipelineStageStarted(String stageName) {
     if (verbose > 0) {
-      def gitcommit = ks.gh.getLatestCommit()
-      sendIrcMsg(ks.emailToUsername(gitcommit.committer.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> ${IRCBROWN}Starting $stageName${IRCCLEAR}")
+      def gitcommit = ks.commitToBuild
+      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> ${IRCBROWN}Starting $stageName${IRCCLEAR}")
     }
   }
 
   void sendIrcMsgPipelineStageSuccess(String stageName) {
     if (verbose > 0) {
-      def gitcommit = ks.gh.getLatestCommit()
-      sendIrcMsg(ks.emailToUsername(gitcommit.committer.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName ${IRCGREEN}${IRCBOLD}"+(ks.currentBuild.result ?: "SUCCESS")+"${IRCCLEAR}")
+      def gitcommit = ks.commitToBuild
+      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName ${IRCGREEN}${IRCBOLD}"+(ks.currentBuild.result ?: "SUCCESS")+"${IRCCLEAR}")
     }
   }
 
   void sendIrcMsgPipelineStageFailure(String stageName, Exception e) {
     //if (verbose > 0) {
-      def gitcommit = ks.gh.getLatestCommit()
-      sendIrcMsg(ks.emailToUsername(gitcommit.committer.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName ${IRCRED}${IRCBOLD}"+ks.currentBuild.result+"${IRCCLEAR}: "+e.toString())
+      def gitcommit = ks.commitToBuild
+      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName ${IRCRED}${IRCBOLD}"+ks.currentBuild.result+"${IRCCLEAR}: "+e.toString())
     //}
   }
 
   void sendIrcMsgPipelineSuccess() {
     //if (verbose > 0) {
-      def gitcommit = ks.gh.getLatestCommit()
-      sendIrcMsg(ks.emailToUsername(gitcommit.committer.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> Commit '${gitcommit.title}' ${IRCGREEN}passed the pipeline.${IRCCLEAR}")
+      def gitcommit = ks.commitToBuild
+      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> Commit '${gitcommit.title}' ${IRCGREEN}passed the pipeline.${IRCCLEAR}")
     //}
   }
 

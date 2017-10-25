@@ -16,7 +16,6 @@ def gitconnection = [:]
 gitconnection.baseurl =      "https://api.github.com/repos"
 gitconnection.organization = "KohaSuomi"
 gitconnection.repo =         "Koha"
-gitconnection.branch =       "ks-rumble"
 
 ks.Util ks = new ks.Util(gitconnection, env, currentBuild, verbosity)
 
@@ -25,11 +24,31 @@ ks.Util ks = new ks.Util(gitconnection, env, currentBuild, verbosity)
   invoke them with env.NODE_NAME
 */
 
+/*
+ *  Figure out is the build request targeted to the 'production' or the 'testing' branch?
+ */
 
+Boolean commitToProduction = false
+
+ks.Git.Commit newestCommit = ks.gh.getNewestCommit()
+
+String branchToBuild;
+if (ks.gh.isCommitInBranch(newestCommit, 'production')) {
+  branchToBuild = 'production'
+  commitToProduction = true
+}
+else {
+  branchToBuild = 'testing'
+  commitToProduction = false
+}
+ks.setCommitToBuild( newestCommit, branchToBuild )
 
 ks.irc.sendIrcMsgPipelineStarted()
 stage('Deploy testing') {
+    if (! commitToProduction) {
+
     def stageName = "Deploy testing"
+
     node {
         try {
             ks.irc.sendIrcMsgPipelineStageStarted(stageName)
@@ -45,10 +64,14 @@ stage('Deploy testing') {
             throw e
         }
     }
+    }
 }
 
 stage('Git tests') {
+    if (! commitToProduction) {
+
     def stageName = "Git tests"
+
     node {
         try {
             ks.irc.sendIrcMsgPipelineStageStarted(stageName)
@@ -75,10 +98,14 @@ stage('Git tests') {
             throw e
         }
     }
+    }
 }
 
 stage('All tests') {
+    if (! commitToProduction) {
+
     def stageName = "All tests"
+
     node {
         try {
             ks.irc.sendIrcMsgPipelineStageStarted(stageName)
@@ -105,17 +132,21 @@ stage('All tests') {
             throw e
         }
     }
+    }
 }
 
-stage('Deploy production') {
-    def stageName = "Deploy production"
-    lock('deploy-to-production') { //Only one executor can deploy to prod at once
+stage('Deploy acceptance testing') {
+    if (commitToProduction) {
+
+    def stageName = "Deploy acceptance testing"
+
+    lock('deploy-to-acceptance-testing') { //Only one executor can deploy to prod at once
         node {
             try {
                 ks.irc.sendIrcMsgPipelineStageStarted(stageName)
                 echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
 
-                sh ks.ansbileTorporInterfaceScriptPath + " deploy koha_ci_*"
+                sh ks.ansbileTorporInterfaceScriptPath + " deploy koha_preproductions"
     
                 ks.currentBuild.result = 'SUCCESS'
     
@@ -128,6 +159,35 @@ stage('Deploy production') {
                 throw e
             }
         }
+    }
+    }
+}
+
+stage('Deploy production') {
+    if (commitToProduction) {
+
+    def stageName = "Deploy production"
+
+    lock('deploy-to-production') { //Only one executor can deploy to prod at once
+        node {
+            try {
+                ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+                echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
+
+                sh ks.ansbileTorporInterfaceScriptPath + " deploy koha_productions"
+    
+                ks.currentBuild.result = 'SUCCESS'
+    
+                ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+                ks.irc.sendIrcMsgPipelineSuccess()
+    
+            } catch(e) {
+                ks.currentBuild.result = 'FAILURE'
+                ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+                throw e
+            }
+        }
+    }
     }
 }
 

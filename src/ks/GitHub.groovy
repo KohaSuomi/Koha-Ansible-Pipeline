@@ -2,6 +2,7 @@ package ks
 
 import groovy.json.JsonSlurperClassic
 import ks.Util
+import ks.Git.Commit
 
 /**
 
@@ -17,19 +18,24 @@ class GitHub implements Serializable {
   String githubBaseurl = "https://api.github.com/repos"
   String organization  = "KohaSuomi"
   String repo          = "Hetula"
-  String branch        = "master"
   ks.Util ks
   Integer verbose
 
-  def githead, gitcommit
+  /**
 
+  @param Map gitconnection Git connection defaults and parameters
+                  .baseurl String github api url basically
+                  .organization String github organization, eg. KohaSuomi
+                  .repo String the repository to target, eg. Koha-translations
+                  .defaultBranch String default branch for API operations
+
+  */
   GitHub(def gitconnection, ks.Util ks, Integer verbosity) {
     this.ks = ks
     this.verbose = verbosity
-    this.githubBaseurl = gitconnection.baseurl
-    this.organization  = gitconnection.organization
-    this.repo          = gitconnection.repo
-    this.branch        = gitconnection.branch
+    this.githubBaseurl    = gitconnection.baseurl
+    this.organization     = gitconnection.organization
+    this.repo             = gitconnection.repo
   }
 
   def _parseJson(string) {
@@ -43,56 +49,68 @@ class GitHub implements Serializable {
     def sout = rv[1]
     def serr = rv[2]
 
-    return _parseJson(sout.toString())
-  }
-
-  def githubGetHEAD() {
-    return _githubApiCall("$githubBaseurl/$organization/$repo/git/refs/heads/$branch")
-  }
-
-  def githubGetCommit(String hash) {
-    return _githubApiCall("$githubBaseurl/$organization/$repo/git/commits/$hash")
-  }
-
-  def getLatestCommit() {
-    if (gitcommit) {
-      return gitcommit
-    }
-
-    try {
-      githead    = githubGetHEAD()
-      gitcommit  = githubGetCommit(githead.object.sha)
-      def gittitle = gitcommit.message.tokenize("\n")[0]
-      def gitauthor  = gitcommit.committer.name
-      gitcommit.author = gitauthor
-      gitcommit.title = gittitle
-    } catch (e) {
+    if (serr) {
       ks.currentBuild.result = 'FAILURE'
-      ks.sendIrcMsgGitHubMalfunction(e)
+      ks.irc.sendIrcMsgGitHubMalfunction(e)
       throw e
     }
 
-    return gitcommit
+    return _parseJson(sout.toString())
+  }
+
+  def getHEADCommitSha(String branchName) {
+    def ref = _githubApiCall("$githubBaseurl/$organization/$repo/git/refs/heads/$branchName")
+    if (ref?.object?.type == 'commit') {
+      return ref.object.sha
+    }
+    else {
+      throw new Exception("GitHub HEAD ref is not a commit? Ref dump:\n$ref")
+    }
+  }
+
+  def getCommit(String sha) {
+    String url = "$githubBaseurl/$organization/$repo/git/commits/$sha";
+    def commit = _githubApiCall(url)
+    if (! commit?.sha) {
+      throw new Exception("No commit found from url '$url'")
+    }
+    return new ks.Git.Commit(commit)
   }
 
   def getRepositoryEvents() {
-    return _githubApiCall("$githubBaseurl/$organization/$repo/events")
+    String url = "$githubBaseurl/$organization/$repo/events";
+    def events = _githubApiCall(url)
+    if (! events?.type) {
+      throw new Exception("No events found from url '$url'")
+    }
+    return events
   }
 
-  def getNewestCommitSha() {
+  def getNewestCommit(String branchName) {
+    String sha = getHEADCommitSha(branchName)
+    return getCommit(sha)
+  }
+
+  def getNewestCommit() {
     def events = getRepositoryEvents()
 
-    String commitSha;
     for (int i=0 ; i<events.size() ; i++) {
-      commitSha = events[i]?.payload?.commits[0]?.sha
-      if (commitSha) { return commitSha }
+      def commit = events[i]?.payload?.commits[0]
+      if (commit) {
+        return new ks.Git.Commit(commit)
+      }
     }
-    throw new Exception("No commit in the newest events list?")
+    throw new Exception("No commit in the newest events list? Events dump:\n$events")
   }
 
-  def isCommitInBranch(String branchName) {
-    def commitSha = getNewestCommitSha()
-    def comparison = _githubApiCall("$githubBaseurl/$organization/$repo/compare/$branchName...$commitSha")
+  /**
+   * GitHub API has no way of clearly telling in which branch a commit is, so we must guess
+   */
+  def isCommitInBranch(def commit, String branchName) {
+    if (! commit?.sha) {
+      throw new Exception("Commit is missing 'sha'? Commit dump:\n$commit");
+    }
+    def comparison = _githubApiCall("$githubBaseurl/$organization/$repo/compare/$branchName..."+commit.sha)
     if (comparison.status == 'identical' || comparison.status == 'behind') {
       return true
     }
@@ -101,3 +119,4 @@ class GitHub implements Serializable {
     }
   }
 }
+

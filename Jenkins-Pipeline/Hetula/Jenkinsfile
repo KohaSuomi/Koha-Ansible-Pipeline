@@ -16,7 +16,6 @@ def gitconnection = [:]
 gitconnection.baseurl = "https://api.github.com/repos"
 gitconnection.organization = "KohaSuomi"
 gitconnection.repo = "Hetula"
-gitconnection.branch = "master"
 
 ks.Util ks = new ks.Util(gitconnection, env, currentBuild, verbosity)
 
@@ -24,6 +23,13 @@ ks.Util ks = new ks.Util(gitconnection, env, currentBuild, verbosity)
   Available environment variables, see. https://wiki.jenkins-ci.org/display/JENKINS/Building+a+software+project
   invoke them with env.NODE_NAME
 */
+
+/*
+ *  Figure out is the build request targeted to the 'production' or the 'testing' branch?
+ */
+
+ks.Git.Commit newestCommit = ks.gh.getNewestCommit('master')
+ks.setCommitToBuild( newestCommit, 'master' )
 
 
 ks.irc.sendIrcMsgPipelineStarted()

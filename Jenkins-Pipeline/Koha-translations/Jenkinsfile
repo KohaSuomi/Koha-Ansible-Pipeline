@@ -4,6 +4,7 @@ import groovy.json.JsonSlurperClassic
 
 @Library('ks-util')
 import ks.Util
+import ks.Git.Commit
 
 def verbosity = 2
 
@@ -16,21 +17,40 @@ def gitconnection = [:]
 gitconnection.baseurl =      "https://api.github.com/repos"
 gitconnection.organization = "KohaSuomi"
 gitconnection.repo =         "Koha-translations"
-gitconnection.branch =       "testing"
 
 ks.Util ks = new ks.Util(gitconnection, env, currentBuild, verbosity)
 
 /*
-  Available environment variables, see. https://wiki.jenkins-ci.org/display/JENKINS/Building+a+software+project
-  invoke them with env.NODE_NAME
-*/
+ * Available environment variables, see. https://wiki.jenkins-ci.org/display/JENKINS/Building+a+software+project
+ * invoke them with env.NODE_NAME
+ */
 
-//Check if the newest commit event is to the 'production' branch
-def commitToProduction = ks.gh.isCommitInBranch('production')
+/*
+ *  Figure out is the build request targeted to the 'production' or the 'testing' branch?
+ */
+
+Boolean commitToProduction = false
+
+ks.Git.Commit newestCommit = ks.gh.getNewestCommit()
+
+String branchToBuild;
+if (ks.gh.isCommitInBranch(newestCommit, 'production')) {
+  branchToBuild = 'production'
+  commitToProduction = true
+}
+else {
+  branchToBuild = 'testing'
+  commitToProduction = false
+}
+ks.setCommitToBuild( newestCommit, branchToBuild )
+
 
 ks.irc.sendIrcMsgPipelineStarted()
 stage('Deploy CI') {
+    if (! commitToProduction) {
+
     def stageName = "Deploy CI"
+
     node {
         try {
             ks.irc.sendIrcMsgPipelineStageStarted(stageName)
@@ -46,11 +66,13 @@ stage('Deploy CI') {
             throw e
         }
     }
+    }
 }
 
 stage('Deploy acceptance testing') {
-    def stageName = "Deploy acceptance testing"
     if (! commitToProduction) {
+
+    def stageName = "Deploy acceptance testing"
 
     lock('deploy-to-acceptance-testing') { //Only one executor can deploy to prod at once
         node {
@@ -58,13 +80,13 @@ stage('Deploy acceptance testing') {
                 ks.irc.sendIrcMsgPipelineStageStarted(stageName)
                 echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
 
-                sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_ci_*"
-    
+                sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_preproductions"
+
                 ks.currentBuild.result = 'SUCCESS'
-    
+
                 ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
                 ks.irc.sendIrcMsgPipelineSuccess()
-    
+
             } catch(e) {
                 ks.currentBuild.result = 'FAILURE'
                 ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
@@ -76,8 +98,9 @@ stage('Deploy acceptance testing') {
 }
 
 stage('Deploy production') {
-    def stageName = "Deploy production"
     if (commitToProduction) {
+
+    def stageName = "Deploy production"
 
     lock('deploy-to-production') { //Only one executor can deploy to prod at once
         node {
@@ -86,12 +109,12 @@ stage('Deploy production') {
                 echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
 
                 sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_productions"
-    
+
                 ks.currentBuild.result = 'SUCCESS'
-    
+
                 ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
                 ks.irc.sendIrcMsgPipelineSuccess()
-    
+
             } catch(e) {
                 ks.currentBuild.result = 'FAILURE'
                 ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)

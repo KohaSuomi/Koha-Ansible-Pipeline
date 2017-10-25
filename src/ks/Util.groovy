@@ -1,6 +1,7 @@
 package ks
 
 import ks.GitHub
+import ks.Git.Commit
 
 /**
 
@@ -20,6 +21,8 @@ class Util implements Serializable {
   public ks.IRC irc
   public def env
   public def currentBuild
+  public ks.Git.Commit commitToBuild
+  public String branchToBuild
 
   public String ansbileTorporInterfaceScriptPath = '/opt/Koha-Ansible-Pipeline/Jenkins-Pipeline/jenkinsToAnsbileTorporInterface.sh'
 
@@ -125,5 +128,14 @@ class Util implements Serializable {
         return "janPasi"
         break
     }
+  }
+
+  /**
+   * Define the commit and optionally the branch the Jenkins build job is going to build
+   *
+   */
+  void setCommitToBuild(ks.Git.Commit commit, String branchName) {
+    commitToBuild = commit
+    branchToBuild = branchName
   }
 }
