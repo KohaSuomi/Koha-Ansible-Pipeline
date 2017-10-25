@@ -33,30 +33,6 @@ inventory_hostname=$2
 testResultsArchive="testResults.tar.gz"
 
 
-#########
-## Echo environment information to make it easier to debug issues with Jenkins shell execution ##
-#########
-
-ymdhms="%Y%m%d%H%M%S"
-
-echo ""
-echo "Environment:"
-echo "- Working directory: "$(pwd)
-echo "- Jenkins workspace: $WORKSPACE"
-echo "- Current script: $0 $*"
-echo "- Current user: "$(whoami)
-echo "- Date "$(date +$ymdhms)
-echo ""
-
-test -z "$WORKSPACE" && exceptionJenkinsEnvNotSet "WORKSPACE"
-
-#########
-## Cleanup previous builds
-#########
-
-test -e "$testResultsArchive" && rm "$testResultsArchive"
-test -e "testResults" && rm -r "testResults"
-
 #############################
 ## Exception handlers here ##
 #############################
@@ -132,6 +108,9 @@ function exceptionAndExit {
   exit $exitCode
 }
 
+
+
+
 ############################
 ## Generic functions here ##
 ############################
@@ -148,63 +127,103 @@ function ansiblePlaybookOk {
 }
 
 
-################
-## Build Koha ##
-################
 
-if [ "$testSuite" == "deploy" ]
-then
-  #ansibleLog=$(cat ansibleLog)
-  buildLog=$(curl --silent --show-error 10.0.3.1:8079/${testSuite}/${inventory_hostname})
-  #Save the build log for further inspection if we crash
-  echo "$buildLog" > buildLog.$inventory_hostname.$(date +$ymdhms)
 
-  ansiblePlaybookOk "$buildLog"
+#########
+## Echo environment information to make it easier to debug issues with Jenkins shell execution ##
+#########
 
-  #Nice. We won!!
-  #Loudly echo the build log
-  echo "$buildLog"
-  exit 0
-fi
+ymdhms="%Y%m%d%H%M%S"
 
-###############
-## Test Koha ##
-###############
+echo ""
+echo "Environment:"
+echo "- Working directory: "$(pwd)
+echo "- Jenkins workspace: $WORKSPACE"
+echo "- Current script: $0 $*"
+echo "- Current user: "$(whoami)
+echo "- Date "$(date +$ymdhms)
+echo ""
 
-### Run the tests via AnsbileTorpor -> Ansible -> Koha
-### Receive an archive of test deliverables or error text
+test -z "$WORKSPACE" && exceptionJenkinsEnvNotSet "WORKSPACE"
 
-## Run the tests
-ansibleLog=$(curl --silent --show-error 10.0.3.1:8079/${testSuite}/${inventory_hostname})
-#ansibleLog=$(cat ansibleLog.$inventory_hostname.$(date +$ymdhms))
+#########
+## Cleanup previous builds
+#########
 
-#Save the build log for further inspection if we crash
-echo "$ansibleLog" > ansibleLog.$inventory_hostname.$(date +$ymdhms)
-
-ansiblePlaybookOk "$ansibleLog"
-
-## Receive test deliverables
-curl --silent --show-error 10.0.3.1:8079/${inventory_hostname}/testResults.tar.gz > $testResultsArchive
-#If what we received is not a .tar-archive, it is an error
-if ! tar --test-label -f $testResultsArchive
-then
-  testLog=$(cat "$testResultsArchive")
-  exceptionAnsibleTestsCrashed "$testLog"
-fi
+test -e "$testResultsArchive" && rm "$testResultsArchive"
+test -e "testResults" && rm -r "testResults"
 
 
 
-tar -xzf $testResultsArchive
 
-[ ! -d "testResults" ] &&                exceptionNoTestResults
-[ ! -d "testResults/junit" ] &&          exceptionMissingJunitDir
-[ -z "$(ls -A testResults/junit/)" ] &&  exceptionMissingJunitDeliverables
-[ ! -d "testResults/clover" ] &&         exceptionMissingCloverDir
-[ -z "$(ls -A testResults/clover/)" ] && exceptionMissingCloverDeliverables
+case "$testSuite" in
 
-#Nice. We won!!
-#Loudly echo the test log
-echo "$ansibleLog"
-exit 0
+ ################
+## Deploy stuff ##
+ ################
 
+  deploy*)
+    #ansibleLog=$(cat ansibleLog)
+    buildLog=$(curl --silent --show-error 10.0.3.1:8079/${testSuite}/${inventory_hostname})
+    #Save the build log for further inspection if we crash
+    echo "$buildLog" > buildLog.$inventory_hostname.$(date +$ymdhms)
+
+    ansiblePlaybookOk "$buildLog"
+
+    #Nice. We won!!
+    #Loudly echo the build log
+    echo "$buildLog"
+    exit 0
+  ;;
+
+ ###############
+## Test  stuff ##
+ ###############
+
+  test*)
+    ### Run the tests via AnsbileTorpor -> Ansible -> Koha
+    ### Receive an archive of test deliverables or error text
+
+    ## Run the tests
+    ansibleLog=$(curl --silent --show-error 10.0.3.1:8079/${testSuite}/${inventory_hostname})
+    #ansibleLog=$(cat ansibleLog.$inventory_hostname.$(date +$ymdhms))
+
+    #Save the build log for further inspection if we crash
+    echo "$ansibleLog" > ansibleLog.$inventory_hostname.$(date +$ymdhms)
+
+    ansiblePlaybookOk "$ansibleLog"
+
+    ## Receive test deliverables
+    curl --silent --show-error 10.0.3.1:8079/${inventory_hostname}/testResults.tar.gz > $testResultsArchive
+    #If what we received is not a .tar-archive, it is an error
+    if ! tar --test-label -f $testResultsArchive
+    then
+      testLog=$(cat "$testResultsArchive")
+      exceptionAnsibleTestsCrashed "$testLog"
+    fi
+
+
+
+    tar -xzf $testResultsArchive
+
+    [ ! -d "testResults" ] &&                exceptionNoTestResults
+    [ ! -d "testResults/junit" ] &&          exceptionMissingJunitDir
+    [ -z "$(ls -A testResults/junit/)" ] &&  exceptionMissingJunitDeliverables
+    [ ! -d "testResults/clover" ] &&         exceptionMissingCloverDir
+    [ -z "$(ls -A testResults/clover/)" ] && exceptionMissingCloverDeliverables
+
+    #Nice. We won!!
+    #Loudly echo the test log
+    echo "$ansibleLog"
+    exit 0
+  ;;
+
+ ######################
+## Unknown build mode ##
+ ######################
+
+  *)
+    echo "\n\nUnknown testSuite '$testSuite'\n\n"
+    exceptionAndExit "" "Unknown testSuite '$testSuite'" 1
+  ;;
 
