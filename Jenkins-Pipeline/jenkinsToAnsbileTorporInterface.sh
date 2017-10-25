@@ -226,4 +226,5 @@ case "$testSuite" in
     echo "\n\nUnknown testSuite '$testSuite'\n\n"
     exceptionAndExit "" "Unknown testSuite '$testSuite'" 1
   ;;
+esac
 
