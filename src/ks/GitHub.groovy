@@ -75,4 +75,29 @@ class GitHub implements Serializable {
     return gitcommit
   }
 
+  def getRepositoryEvents() {
+    return _githubApiCall("$githubBaseurl/$organization/$repo/events")
+  }
+
+  def getNewestCommitSha() {
+    def events = getRepositoryEvents()
+
+    String commitSha;
+    for (int i=0 ; i<events.size() ; i++) {
+      commitSha = events[i]?.payload?.commits[0]?.sha
+      if (commitSha) { return commitSha }
+    }
+    throw new Exception("No commit in the newest events list?")
+  }
+
+  def isCommitInBranch(String branchName) {
+    def commitSha = getNewestCommitSha()
+    def comparison = _githubApiCall("$githubBaseurl/$organization/$repo/compare/$branchName...$commitSha")
+    if (comparison.status == 'identical' || comparison.status == 'behind') {
+      return true
+    }
+    else {
+      return false
+    }
+  }
 }
