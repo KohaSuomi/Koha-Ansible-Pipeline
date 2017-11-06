@@ -33,6 +33,15 @@ Boolean commitToProduction = false
 
 ks.Git.Commit newestCommit = ks.gh.getNewestCommit()
 
+/*
+ * If commit is from koha-user, and is an automatic translation key update, skip this build.
+ */
+if (newestCommit.author =~ /(?i)koha/) {
+  ks.currentBuild.result = 'SUCCESS'
+  return true;
+}
+
+
 String branchToBuild;
 if (ks.gh.isCommitInBranch(newestCommit, 'production')) {
   branchToBuild = 'production'
@@ -47,77 +56,77 @@ ks.setCommitToBuild( newestCommit, branchToBuild )
 
 ks.irc.sendIrcMsgPipelineStarted()
 stage('Deploy CI') {
-    if (! commitToProduction) {
+  if (! commitToProduction) {
 
-    def stageName = "Deploy CI"
+  def stageName = "Deploy CI"
 
-    node {
-        try {
-            ks.irc.sendIrcMsgPipelineStageStarted(stageName)
-            echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
+  node {
+    try {
+      //ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+      echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
 
-            sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_translations"
+      sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_translations"
 
-            ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+      ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
 
-        } catch(e) {
-            ks.currentBuild.result = 'FAILURE'
-            ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
-            throw e
-        }
-    } //end node
-    } //end if
+    } catch(e) {
+      ks.currentBuild.result = 'FAILURE'
+      ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+      throw e
+    }
+  } //end node
+  } //end if
 }
 
 stage('Deploy acceptance testing') {
-    if (! commitToProduction) {
+  if (! commitToProduction) {
 
-    def stageName = "Deploy acceptance testing"
+  def stageName = "Deploy acceptance testing"
 
-    node {
-        try {
-            ks.irc.sendIrcMsgPipelineStageStarted(stageName)
-            echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
+  node {
+    try {
+      //ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+      echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
 
-            sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_preproductions"
+      sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_preproductions"
 
-            ks.currentBuild.result = 'SUCCESS'
+      ks.currentBuild.result = 'SUCCESS'
 
-            ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
-            ks.irc.sendIrcMsgPipelineSuccess()
+      ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+      ks.irc.sendIrcMsgPipelineSuccess()
 
-        } catch(e) {
-            ks.currentBuild.result = 'FAILURE'
-            ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
-            throw e
-        }
-    } //end node
-    } //end if
+    } catch(e) {
+      ks.currentBuild.result = 'FAILURE'
+      ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+      throw e
+    }
+  } //end node
+  } //end if
 }
 
 stage('Deploy production') {
-    if (commitToProduction) {
+  if (commitToProduction) {
 
-    def stageName = "Deploy production"
+  def stageName = "Deploy production"
 
-    node {
-        try {
-            ks.irc.sendIrcMsgPipelineStageStarted(stageName)
-            echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
+  node {
+    try {
+      //ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+      echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
 
-            sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_productions"
+      sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_productions"
 
-            ks.currentBuild.result = 'SUCCESS'
+      ks.currentBuild.result = 'SUCCESS'
 
-            ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
-            ks.irc.sendIrcMsgPipelineSuccess()
+      ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+      ks.irc.sendIrcMsgPipelineSuccess()
 
-        } catch(e) {
-            ks.currentBuild.result = 'FAILURE'
-            ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
-            throw e
-        }
-    } //end node
-    } //end if
+    } catch(e) {
+      ks.currentBuild.result = 'FAILURE'
+      ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+      throw e
+    }
+  } //end node
+  } //end if
 }
 

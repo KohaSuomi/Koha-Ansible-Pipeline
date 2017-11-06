@@ -40,6 +40,14 @@ def gitcommit = ks.gh.getNewestCommit('master')
 println gitcommit
 println ""
 
+if (gitcommit.author =~ /(?i)kivilahti/) {
+  println gitcommit.author+" contains /(?i)kivilahti/";
+}
+else {
+  println gitcommit.author+" doesn't contain /(?i)kivilahti/";
+}
+println ""
+
 println "*************************************************************"
 println "*Newest commit from a branch from Koha-translations:*"
 println "*************************************************************"
