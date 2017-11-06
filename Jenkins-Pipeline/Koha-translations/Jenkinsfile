@@ -39,7 +39,7 @@ if (ks.gh.isCommitInBranch(newestCommit, 'production')) {
   commitToProduction = true
 }
 else {
-  branchToBuild = 'testing'
+  branchToBuild = 'master'
   commitToProduction = false
 }
 ks.setCommitToBuild( newestCommit, branchToBuild )
@@ -56,7 +56,7 @@ stage('Deploy CI') {
             ks.irc.sendIrcMsgPipelineStageStarted(stageName)
             echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
 
-            sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_ci_"+(Integer.parseInt(env.EXECUTOR_NUMBER)+1)
+            sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_translations"
 
             ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
 
@@ -65,8 +65,8 @@ stage('Deploy CI') {
             ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
             throw e
         }
-    }
-    }
+    } //end node
+    } //end if
 }
 
 stage('Deploy acceptance testing') {
@@ -74,27 +74,25 @@ stage('Deploy acceptance testing') {
 
     def stageName = "Deploy acceptance testing"
 
-    lock('deploy-to-acceptance-testing') { //Only one executor can deploy to prod at once
-        node {
-            try {
-                ks.irc.sendIrcMsgPipelineStageStarted(stageName)
-                echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
+    node {
+        try {
+            ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+            echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
 
-                sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_preproductions"
+            sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_preproductions"
 
-                ks.currentBuild.result = 'SUCCESS'
+            ks.currentBuild.result = 'SUCCESS'
 
-                ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
-                ks.irc.sendIrcMsgPipelineSuccess()
+            ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+            ks.irc.sendIrcMsgPipelineSuccess()
 
-            } catch(e) {
-                ks.currentBuild.result = 'FAILURE'
-                ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
-                throw e
-            }
+        } catch(e) {
+            ks.currentBuild.result = 'FAILURE'
+            ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+            throw e
         }
-    }
-    }
+    } //end node
+    } //end if
 }
 
 stage('Deploy production') {
@@ -102,26 +100,24 @@ stage('Deploy production') {
 
     def stageName = "Deploy production"
 
-    lock('deploy-to-production') { //Only one executor can deploy to prod at once
-        node {
-            try {
-                ks.irc.sendIrcMsgPipelineStageStarted(stageName)
-                echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
+    node {
+        try {
+            ks.irc.sendIrcMsgPipelineStageStarted(stageName)
+            echo "\n###############################################################################\n###############################################################################\n    ####################     $stageName    ####################\n###############################################################################\n###############################################################################\n"
 
-                sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_productions"
+            sh ks.ansbileTorporInterfaceScriptPath + " deploy-translations koha_productions"
 
-                ks.currentBuild.result = 'SUCCESS'
+            ks.currentBuild.result = 'SUCCESS'
 
-                ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
-                ks.irc.sendIrcMsgPipelineSuccess()
+            ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
+            ks.irc.sendIrcMsgPipelineSuccess()
 
-            } catch(e) {
-                ks.currentBuild.result = 'FAILURE'
-                ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
-                throw e
-            }
+        } catch(e) {
+            ks.currentBuild.result = 'FAILURE'
+            ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
+            throw e
         }
-    }
-    }
+    } //end node
+    } //end if
 }
 
