@@ -29,6 +29,7 @@ use Cwd;
 
 use IPC::Cmd;
 use File::Basename;
+use File::Path qw(make_path);
 use TAP::Harness::JUnit;
 use Params::Validate qw(:all);
 
@@ -96,6 +97,14 @@ my $validationNew = {
   testFiles => {
     callbacks => $validationTestFilesCallbacks,
   },
+  dbDiff => {default => 0},
+  dbUser => {default => undef},
+  dbPass => {default => undef},
+  dbHost => {default => undef},
+  dbPort => {default => undef},
+  dbDatabase => {default => undef},
+  dbSocket => {default => undef},
+  dbDiffIgnoreTables => {default => undef}
 };
 sub new {
 #  $validationTestFilesCallbacks->{$_}(['/tmp']) for (keys(%$validationTestFilesCallbacks));
@@ -149,8 +158,10 @@ sub prepareTestResultDirectories {
   mkdir $self->{testResultsDir} unless -d $self->{testResultsDir};
   $self->_shell("rm", "-r $self->{junitDir}")  if -e $self->{junitDir};
   $self->_shell("rm", "-r $self->{cloverDir}") if -e $self->{cloverDir};
+  $self->_shell("rm", "-r $self->{dbDiffDir}")  if -e $self->{dbDiffDir};
   mkdir $self->{junitDir} unless -d $self->{junitDir};
   mkdir $self->{cloverDir} unless -d $self->{cloverDir};
+  mkdir $self->{dbDiffDir} unless -d $self->{dbDiffDir};
   unlink $self->{testResultsArchive} if -e $self->{testResultsArchive};
 }
 
@@ -170,6 +181,7 @@ sub getTestResultFileAndDirectoryPaths {
   $hash->{junitDir} =  $hash->{testResultsDir}.'/junit';
   $hash->{cloverDir} = $hash->{testResultsDir}.'/clover';
   $hash->{cover_dbDir} = $hash->{testResultsDir}.'/cover_db';
+  $hash->{dbDiffDir} = $hash->{testResultsDir}.'/dbDiff';
 }
 
 =head2 clearCoverDb
@@ -229,6 +241,10 @@ sub runharness {
   my ($self) = @_;
   my $filesByDir = $self->{testFilesByDir};
 
+  if ($self->isDbDiff()) {
+    $self->databaseDiff(); # Initialize first mysqldump before running any tests
+  }
+
   foreach my $dir (sort keys %$filesByDir) {
     my @tests = sort @{$filesByDir->{$dir}};
     unless (scalar(@tests)) {
@@ -259,6 +275,13 @@ sub runharness {
             package => "",
             verbosity => $self->verbosity(),
             namemangle => 'perl',
+            callbacks => {
+              after_test => sub {
+                $self->databaseDiff({
+                  test => shift->[0], parser => shift
+                }) if $self->isDbDiff();
+              },
+            },
             exec       => \@exec,
         });
         $harness->runtests(@tests);
@@ -266,6 +289,13 @@ sub runharness {
       else {
         $harness = TAP::Harness->new({
             verbosity => $self->verbosity(),
+            callbacks => {
+              after_test => sub {
+                $self->databaseDiff({
+                  test => shift->[0], parser => shift
+                }) if $self->isDbDiff()
+              },
+            },
             exec       => \@exec,
         });
         $harness->runtests(@tests);
@@ -276,6 +306,9 @@ sub runharness {
 
 sub isClover {
   return shift->{_params}->{clover};
+}
+sub isDbDiff {
+  return shift->{_params}->{dbDiff};
 }
 sub isJunit {
   return shift->{_params}->{junit};
@@ -288,6 +321,110 @@ sub verbosity {
 }
 sub lib {
   return shift->{_params}->{lib};
+}
+
+=head2 databaseDiff
+
+Diffs two mysqldumps and finds changes to INSERT INTO queries. Collects names of
+the tables that have new INSERTs.
+
+=cut
+
+sub databaseDiff {
+    my ($self, $params) = @_;
+
+    my $test   = $params->{test};
+
+    my $user = $self->{_params}->{dbUser};
+    my $pass = $self->{_params}->{dbPass};
+    my $host = $self->{_params}->{dbHost};
+    my $port = $self->{_params}->{dbPort};
+    my $db   = $self->{_params}->{dbDatabase};
+    my $sock = $self->{_params}->{dbSocket};
+
+    unless (defined $user) {
+        die 'KSTestHarness->databaseDiff(): Parameter dbUser undefined';
+    }
+    unless (defined $host) {
+        die 'KSTestHarness->databaseDiff(): Parameter dbHost undefined';
+    }
+    unless (defined $port) {
+        die 'KSTestHarness->databaseDiff(): Parameter dbPort undefined';
+    }
+    unless (defined $db) {
+        die 'KSTestHarness->databaseDiff(): Parameter dbDatabase undefined';
+    }
+
+    $self->{_params}->{tmpDbDiffDir} ||= '/tmp/KSTestHarness/dbDiff';
+    my $path = $self->{_params}->{tmpDbDiffDir};
+    unless (-e $path) {
+        make_path($path);
+    }
+
+    my @mysqldumpargs = (
+        'mysqldump',
+        '-u', $user,
+        '-h', $host,
+        '-P', $port
+    );
+
+    push @mysqldumpargs, "-p$pass" if defined $pass;
+
+    if ($sock) {
+        push @mysqldumpargs, '--protocol=socket';
+        push @mysqldumpargs, '-S';
+        push @mysqldumpargs, $sock;
+    }
+    push @mysqldumpargs, $db;
+
+    unless ($test && -e "$path/previous.sql") {
+        eval { $self->_shell(@mysqldumpargs, '>', "$path/previous.sql"); };
+    }
+    return 1 unless defined $test;
+
+    eval { $self->_shell(@mysqldumpargs, '>', "$path/current.sql"); };
+
+    my $diff;
+    eval {
+        $self->_shell(
+            'git', 'diff', '--color-words', '--no-index', '-U0',
+            "$path/previous.sql", "$path/current.sql"
+        );
+    };
+    my @tables;
+    if ($diff = $@) {
+        # Remove everything else except INSERT INTO queries
+        $diff =~ s/(?!^.*INSERT INTO .*$)^.+//mg;
+        $diff =~ s/^\n*//mg;
+        @tables = $diff =~ /^INSERT INTO `(.*)`/mg; # Collect names of tables
+        if ($self->{_params}->{dbDiffIgnoreTables}) {
+          foreach my $table (@{$self->{_params}->{dbDiffIgnoreTables}}) {
+            if (grep(/$table/, @tables)) {
+              @tables = grep { $_ ne $table } @tables;
+            }
+          }
+        }
+        if (@tables) {
+            if ($params->{parser}) {
+              $self->_add_failed_test_dynamically(
+                  $params->{parser}, "Test $test leaking test data to following ".
+                  "tables:\n". Data::Dumper::Dumper(@tables)
+              );
+            }
+            if ($self->verbosity) {
+                print "New inserts at tables:\n" . Data::Dumper::Dumper(@tables);
+            }
+            my $filename = dirname($test);
+            make_path("$self->{dbDiffDir}/$filename");
+            open my $fh, '>>', "$self->{dbDiffDir}/$test.out";
+            print $fh $diff;
+            close $fh;
+        }
+    }
+
+    $self->_shell('mv', "$path/current.sql", "$path/previous.sql");
+
+    return @tables;
 }
 
 sub setResultsDir {
@@ -322,6 +459,52 @@ sub _sortFilesByDir {
         push (@{$dirsWithFiles{$dir}}, $f);
     }
     return \%dirsWithFiles;
+}
+
+=head2 _add_failed_test_dynamically
+
+Dynamically generates a failed test and pushes the result to the end of
+TAP::Parser::Result->{__results} for JUnit.
+
+C<$parser> is an instance of TAP::Harness::JUnit::Parser
+C<$desc> is a custom description for the test
+
+=cut
+
+sub _add_failed_test_dynamically {
+  my ($self, $parser, $desc) = @_;
+
+  $desc ||= 'Dynamically failed test';
+  my $test_num = $parser->tests_run+1;
+  my @plan_split = split(/\.\./, $parser->{plan});
+  my $plan = $plan_split[0].'..'.++$plan_split[1];
+  $parser->{plan} = $plan;
+
+  if (ref($parser) eq 'TAP::Harness::JUnit::Parser') {
+    my $failed = {};
+    $failed->{ok} = 'not ok';
+    $failed->{test_num} = $test_num;
+    $failed->{description} = $desc;
+    $failed->{raw} = "not ok $test_num - $failed->{description}";
+    $failed->{type} = 'test';
+    $failed->{__end_time} = 0;
+    $failed->{__start_time} = 0;
+    $failed->{directive} = '';
+    $failed->{explanation} = '';
+    bless $failed, 'TAP::Parser::Result::Test';
+
+    push @{$parser->{__results}}, $failed;
+    $parser->{__results}->[0]->{raw} = $plan;
+    $parser->{__results}->[0]->{tests_planned}++;
+  }
+  push @{$parser->{failed}}, $test_num;
+  push @{$parser->{actual_failed}}, $test_num;
+  
+  $parser->{tests_planned}++;
+  $parser->{tests_run}++;
+  print "not ok $test_num - $desc";
+
+  return $parser;
 }
 
 sub _shell {
