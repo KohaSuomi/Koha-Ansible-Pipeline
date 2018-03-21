@@ -25,7 +25,7 @@ class IRC implements Serializable {
   def IRCGREEN = "\u000303"
   def IRCBROWN = "\u000305"
   def IRCBOLD  = "\u0002"
-
+  def IRCYELLOW = "\u000308"
 
   /**
 
@@ -78,14 +78,14 @@ class IRC implements Serializable {
   void sendIrcMsgPipelineStageSuccess(String stageName) {
     if (verbose > 0) {
       def gitcommit = ks.commitToBuild
-      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName ${IRCGREEN}${IRCBOLD}"+(ks.currentBuild.result ?: "SUCCESS")+"${IRCCLEAR}")
+      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName "+formatResult(ks.currentBuild.result))
     }
   }
 
   void sendIrcMsgPipelineStageFailure(String stageName, Exception e) {
     //if (verbose > 0) {
       def gitcommit = ks.commitToBuild
-      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName ${IRCRED}${IRCBOLD}"+ks.currentBuild.result+"${IRCCLEAR}: "+e.toString())
+      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName "+formaResult(ks.currentBuild.result)+": "+e.toString())
     //}
   }
 
@@ -96,4 +96,13 @@ class IRC implements Serializable {
     //}
   }
 
+  String formatResult(String result) {
+    if (result == 'SUCCESS') {
+      return "${IRCGREEN}${IRCBOLD}"+result+"${IRCCLEAR}"
+    } else if (result == 'UNSTABLE') {
+      return "${IRCYELLOW}${IRCBOLD}"+result+"${IRCCLEAR}"
+    } else {
+      return "${IRCRED}${IRCBOLD}FAILURE${IRCCLEAR}"
+    }
+  }
 }
