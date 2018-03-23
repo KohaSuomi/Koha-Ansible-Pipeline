@@ -85,7 +85,7 @@ class IRC implements Serializable {
   void sendIrcMsgPipelineStageFailure(String stageName, Exception e) {
     //if (verbose > 0) {
       def gitcommit = ks.commitToBuild
-      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName "+formaResult(ks.currentBuild.result)+": "+e.toString())
+      sendIrcMsg(ks.emailToUsername(gitcommit.email)+": ${IRCBROWN}Build "+ks.env.BUILD_ID+"> $stageName "+formatResult(ks.currentBuild.result)+": "+e.toString())
     //}
   }
 
