@@ -125,12 +125,13 @@ stage('All tests') {
             ])
 
             ks.irc.sendIrcMsgPipelineStageSuccess(stageName)
-
+            if (ks.currentBuild.result == 'UNSTABLE') {
+                error "Unstable build. Forcing failure."
+            }
         } catch(e) {
-//Ignore faulting full test suite for now.
             ks.currentBuild.result = 'FAILURE'
             ks.irc.sendIrcMsgPipelineStageFailure(stageName, e)
-//            throw e
+            throw e
         }
     }
     }
