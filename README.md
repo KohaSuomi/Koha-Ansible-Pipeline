@@ -18,9 +18,18 @@ https://github.com/KohaSuomi/Hetula
 
 ## Koha-Suomi Test Harness
 
+The version here is deprecated!
+Use
+
+`https://metacpan.org/pod/Test::Harness::KS`
+
+instead
+
+
 Harness the power of clover and junit in one easy to use wrapper.
 Simply give a list of test files to execute and he will take care of all the configuration hassle to get Clover and Junit
 working with Perl.
+
 
 ## Jenkins Groovy global shared directories
 
